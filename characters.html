@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+</script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pacman 3D - Personagens</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body class="characters-page">
+    <div id="app"></div>
+    <div class="character-viewer-ui">
+      <button id="backToMazeButton" class="viewer-button">Voltar ao Labirinto</button>
+      <div class="character-viewer-nav">
+        <button id="previousCharacterButton" class="viewer-arrow-button" aria-label="Personagem anterior">&lt;</button>
+        <span id="characterNameLabel" class="viewer-character-name">Pacman</span>
+        <button id="nextCharacterButton" class="viewer-arrow-button" aria-label="Próxima personagem">&gt;</button>
+      </div>
+      <p class="viewer-help">Arrasta para rodar, roda do rato para aproximar/afastar.</p>
+    </div>
+    <script type="module" src="/src/characters.js"></script>
+  </body>
+</html>
