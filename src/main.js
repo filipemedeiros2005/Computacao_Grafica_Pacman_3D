@@ -1,5 +1,11 @@
 import * as THREE from "three";
+import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 const app = document.querySelector("#app");
+
+
+//Variáveis de controlo da camara
+let controls;
+let pacmanUltimaPosicao = new THREE.Vector3();
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true }); //antilias faz com que as arestas sejam mais lisas
@@ -12,14 +18,31 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x030712); //cor de fundo do ecrã
 
 // Camara
-const camera = new THREE.PerspectiveCamera(
-    60, //FOV
-    window.innerWidth / window.innerHeight, //Aspect ratio, definindo o aspeto da imagem
-    0.1, //Distancia minima a que os objetos são visiveis, tudo o que esta mais perto do que isto e cortado
-    400 //distancia maxima visivel a que os objetos são visiveis, tudo o que esta mais longe disto e cortado
+
+let camera2D, camera3D, cameraAtiva;
+
+// Tira o "const" que estava aqui e usa o camera2D
+camera2D = new THREE.PerspectiveCamera(
+  60, //FOV
+  window.innerWidth / window.innerHeight, //Aspect ratio
+  0.1, //Distancia minima
+  400 //distancia maxima
 );
-camera.position.set(0, 24, 18); //onde esta a camara
-camera.lookAt(0, 0, 0); //para onde a camara aponta
+// Altera "camera" para "camera2D"
+camera2D.position.set(0, 24, 18); 
+camera2D.lookAt(0, 0, 0); 
+
+camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+// Configurar o OrbitControls na câmera 3D
+controls = new OrbitControls(camera3D, renderer.domElement);
+controls.enabled = false; // Desligado na visão 2D
+controls.enablePan = false; // Impede o jogador de arrastar a câmera para longe do Pacman com o botão direito
+controls.minDistance = 2; // Distância mínima do zoom
+controls.maxDistance = 15; // Distância máxima do zoom
+
+cameraAtiva = camera2D;
+let is3DView = false;
 
 // Luzes
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); //luz de ambiente ilumina tudo igualmente com luz branca
@@ -58,8 +81,8 @@ const mazeDepth = mazeLayout.length * tileSize;
 const xOffset = -mazeWidth / 2 + tileSize / 2;
 const zOffset = -mazeDepth / 2 + tileSize / 2;
 
-camera.position.set(0, Math.max(26, mazeDepth * 1.1), mazeDepth * 0.8);
-camera.lookAt(0, 0, 0);
+camera2D.position.set(0, Math.max(26, mazeDepth * 1.1), mazeDepth * 0.8);
+camera2D.lookAt(0, 0, 0);
 
 const wallGeometry = new THREE.BoxGeometry(tileSize, wallHeight, tileSize);
 const wallMaterial = new THREE.MeshStandardMaterial({
@@ -337,11 +360,38 @@ viewToggleButton.addEventListener("click", () => {
 });
 
 window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
+  camera2D.aspect = window.innerWidth / window.innerHeight;
+  camera2D.updateProjectionMatrix();
+
+  camera3D.aspect = window.innerWidth / window.innerHeight;
+  camera3D.updateProjectionMatrix();
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+window.addEventListener('keydown', (event) => {
+    if (event.key === 'v' || event.key === 'V') {
+        is3DView = !is3DView;
+        cameraAtiva = is3DView ? camera3D : camera2D;
+
+        if (is3DView) {
+            controls.enabled = true;
+            
+            // Coloca a câmera inicialmente atrás do Pacman
+            const offsetInicial = new THREE.Vector3(0, 3, 5).applyMatrix4(pacman.matrixWorld);
+            camera3D.position.copy(offsetInicial);
+            
+            // Define o alvo dos controlos e atualiza
+            controls.target.copy(pacman.position);
+            controls.update();
+
+            // Guarda a posição do Pacman neste instante
+            pacmanUltimaPosicao.copy(pacman.position);
+        } else {
+            controls.enabled = false;
+        }
+    }
 });
 
 const clock = new THREE.Clock();
@@ -353,7 +403,29 @@ function animate() {
   directionalLight.position.x = 10 * Math.cos(t * 0.3);
   directionalLight.position.z = 10 * Math.sin(t * 0.3);
 
-  renderer.render(scene, camera);
+  // APAGA a linha: renderer.render(scene, camera); que estava aqui
+
+  if (is3DView) {
+    // 1. Descobrir o quanto o Pacman se moveu desde o último frame
+    const diferencaMovimento = new THREE.Vector3().copy(pacman.position).sub(pacmanUltimaPosicao);
+
+    // 2. Mover a câmera exatamente essa mesma distância
+    // Isso mantém a distância e o ângulo criados pelo rato intactos!
+    camera3D.position.add(diferencaMovimento);
+
+    // 3. Atualizar o alvo do OrbitControls para seguir o Pacman
+    controls.target.copy(pacman.position);
+    controls.target.y += 0.5; // Focar um pouco acima do chão (na cabeça do Pacman)
+
+    // 4. Atualizar os controlos
+    controls.update();
+
+    // 5. Guardar a posição atual do Pacman para usar no próximo frame
+    pacmanUltimaPosicao.copy(pacman.position);
+}
+  
+  // Mantém apenas o render com a cameraAtiva no final
+  renderer.render(scene, cameraAtiva);
 }
 
 animate();
