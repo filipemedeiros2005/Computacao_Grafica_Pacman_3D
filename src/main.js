@@ -40,6 +40,8 @@ controls.enabled = false; // Desligado na visão 2D
 controls.enablePan = false; // Impede o jogador de arrastar a câmera para longe do Pacman com o botão direito
 controls.minDistance = 2; // Distância mínima do zoom
 controls.maxDistance = 15; // Distância máxima do zoom
+controls.maxPolarAngle = Math.PI / 2; 
+controls.minPolarAngle = 0; // 0 é exatamente por cima, Math.PI/2 é de lado
 
 cameraAtiva = camera2D;
 let is3DView = false;
@@ -378,16 +380,14 @@ window.addEventListener('keydown', (event) => {
         if (is3DView) {
             controls.enabled = true;
             
-            // Coloca a câmera inicialmente atrás do Pacman
-            const offsetInicial = new THREE.Vector3(0, 3, 5).applyMatrix4(pacman.matrixWorld);
-            camera3D.position.copy(offsetInicial);
+            // 1. Reset da posição da câmara para não ficar "colada" ao chão no início
+            camera3D.position.set(pacman.position.x, pacman.position.y + 8, pacman.position.z + 12);
             
-            // Define o alvo dos controlos e atualiza
+            // 2. Apontar o centro de rotação para o Pacman
             controls.target.copy(pacman.position);
+            
+            // 3. Forçar o OrbitControls a registar a nova posição
             controls.update();
-
-            // Guarda a posição do Pacman neste instante
-            pacmanUltimaPosicao.copy(pacman.position);
         } else {
             controls.enabled = false;
         }
@@ -397,34 +397,21 @@ window.addEventListener('keydown', (event) => {
 const clock = new THREE.Clock();
 
 function animate() {
-  requestAnimationFrame(animate);
+  requestAnimationFrame(animate); 
 
   const t = clock.getElapsedTime();
   directionalLight.position.x = 10 * Math.cos(t * 0.3);
   directionalLight.position.z = 10 * Math.sin(t * 0.3);
 
-  // APAGA a linha: renderer.render(scene, camera); que estava aqui
-
   if (is3DView) {
-    // 1. Descobrir o quanto o Pacman se moveu desde o último frame
-    const diferencaMovimento = new THREE.Vector3().copy(pacman.position).sub(pacmanUltimaPosicao);
+    // MOVE O ALVO: A câmara vai seguir o Pacman mantendo a rotação do rato
+    controls.target.lerp(pacman.position, 0.1); // lerp dá um seguimento suave
+    controls.target.y += 0.5; 
 
-    // 2. Mover a câmera exatamente essa mesma distância
-    // Isso mantém a distância e o ângulo criados pelo rato intactos!
-    camera3D.position.add(diferencaMovimento);
-
-    // 3. Atualizar o alvo do OrbitControls para seguir o Pacman
-    controls.target.copy(pacman.position);
-    controls.target.y += 0.5; // Focar um pouco acima do chão (na cabeça do Pacman)
-
-    // 4. Atualizar os controlos
+    // IMPORTANTE: Deixa os controlos calcularem a posição da câmara sozinhos
     controls.update();
+  }
 
-    // 5. Guardar a posição atual do Pacman para usar no próximo frame
-    pacmanUltimaPosicao.copy(pacman.position);
-}
-  
-  // Mantém apenas o render com a cameraAtiva no final
   renderer.render(scene, cameraAtiva);
 }
 
