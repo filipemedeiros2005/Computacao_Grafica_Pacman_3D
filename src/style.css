@@ -180,3 +180,149 @@ canvas {
         right: 12px;
     }
 }
+
+/* --- MENU PRINCIPAL --- */
+.main-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(3, 7, 18, 0.95); /* Fundo escuro quase opaco */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100; /* Garante que fica por cima do jogo 3D */
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+/* Classe que vamos adicionar com JavaScript para esconder o menu */
+.main-menu.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.menu-title {
+    color: #ffd60a;
+    font-size: 4rem;
+    margin-bottom: 3rem;
+    font-family: sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(255, 214, 10, 0.4);
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.menu-btn {
+    padding: 16px 32px;
+    border: 2px solid #60a5fa;
+    border-radius: 12px;
+    background: rgba(30, 64, 175, 0.4);
+    color: #dbeafe;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 240px;
+    text-transform: uppercase;
+}
+
+.menu-btn:hover {
+    background: rgba(59, 130, 246, 0.8);
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(96, 165, 250, 0.5);
+}
+
+/* --- JANELA DE INSTRUÇÕES (MODAL) --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(3, 7, 18, 0.85); /* Fundo escuro semi-transparente */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 150; /* Fica acima do menu principal (z-index: 100) */
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.modal-content {
+    background: rgba(15, 23, 42, 0.95);
+    border: 2px solid #60a5fa;
+    border-radius: 12px;
+    padding: 30px;
+    width: min(500px, 90vw);
+    color: #dbeafe;
+    box-shadow: 0 0 30px rgba(30, 64, 175, 0.6);
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.modal-title {
+    color: #ffd60a;
+    margin: 0;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 1.8rem;
+    text-shadow: 0 0 10px rgba(255, 214, 10, 0.3);
+}
+
+.modal-body {
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.modal-body ul {
+    margin-top: 5px;
+    margin-bottom: 15px;
+    padding-left: 20px;
+}
+
+.modal-body li {
+    margin-bottom: 8px;
+}
+
+/* Um botão ligeiramente mais pequeno para fechar a janela */
+.small-btn {
+    align-self: center;
+    min-width: 150px;
+    padding: 10px 20px;
+    font-size: 1rem;
+}
+
+/* --- BOTÃO VOLTAR AO MENU (DENTRO DO JOGO) --- */
+.in-game-back-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 50; /* Fica acima do jogo, mas abaixo do menu principal */
+    min-width: auto; /* Anula a largura grande dos botões do menu */
+    padding: 10px 20px;
+    font-size: 1rem;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.in-game-back-btn.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}

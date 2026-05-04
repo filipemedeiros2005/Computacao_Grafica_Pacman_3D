@@ -352,15 +352,6 @@ for (const ghostConfig of ghostCells) {
   scene.add(ghost);
 }
 
-const viewToggleButton = document.createElement("button");
-viewToggleButton.className = "view-toggle-button";
-viewToggleButton.textContent = "Ver Personagens";
-document.body.appendChild(viewToggleButton);
-
-viewToggleButton.addEventListener("click", () => {
-  window.location.href = "./characters.html";
-});
-
 window.addEventListener("resize", () => {
   camera2D.aspect = window.innerWidth / window.innerHeight;
   camera2D.updateProjectionMatrix();
@@ -416,3 +407,57 @@ function animate() {
 }
 
 animate();
+
+// --- LÓGICA DO MENU PRINCIPAL ---
+const mainMenu = document.getElementById('mainMenu');
+const playButton = document.getElementById('playButton');
+const charactersMenuButton = document.getElementById('charactersMenuButton');
+// Elemento do novo botão
+const backToMenuButton = document.getElementById('backToMenuButton');
+
+// Quando se clica em "Jogar"
+playButton.addEventListener('click', () => {
+    mainMenu.classList.add('hidden'); // Esconde o menu
+    backToMenuButton.classList.remove('hidden'); // Mostra o botão "Voltar ao Menu"
+});
+
+// Quando se clica em "Voltar ao Menu" (dentro do jogo)
+backToMenuButton.addEventListener('click', () => {
+    mainMenu.classList.remove('hidden'); // Mostra o menu principal novamente
+    backToMenuButton.classList.add('hidden'); // Esconde o botão de voltar
+});
+
+// Quando o jogador clica em "Jogar", escondemos o menu
+playButton.addEventListener('click', () => {
+    mainMenu.classList.add('hidden');
+});
+
+// Quando o jogador clica em "Personagens", vai para a página respetiva
+charactersMenuButton.addEventListener('click', () => {
+    window.location.href = './characters.html';
+});
+
+// --- LÓGICA DOS NOVOS BOTÕES ---
+const instructionsButton = document.getElementById('instructionsButton');
+const exitButton = document.getElementById('exitButton');
+
+// Elementos do Modal (a nova janela)
+const instructionsModal = document.getElementById('instructionsModal');
+const closeInstructionsButton = document.getElementById('closeInstructionsButton');
+
+// Quando se clica em "Instruções", tira a classe 'hidden' para mostrar a janela
+instructionsButton.addEventListener('click', () => {
+    instructionsModal.classList.remove('hidden');
+});
+
+// Quando se clica em "Fechar", volta a adicionar a classe 'hidden' para a esconder
+closeInstructionsButton.addEventListener('click', () => {
+    instructionsModal.classList.add('hidden');
+});
+
+// Lógica do botão Sair (esta mantém-se igual)
+exitButton.addEventListener('click', () => {
+    if (confirm("Tens a certeza que queres sair do jogo?")) {
+        window.location.href = "about:blank"; 
+    }
+});
