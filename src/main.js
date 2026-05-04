@@ -256,11 +256,14 @@ function createGhostModel(color, size) {
   const bodyDepth = size * 0.58;
   const scallopRadius = bodyWidth * 0.15;
   const scallopCenters = [bodyWidth * 0.28, 0, -bodyWidth * 0.28];
+  const glowColor = new THREE.Color(color);
 
   const ghostMaterial = new THREE.MeshStandardMaterial({
-    color,
+    color: glowColor,
     roughness: 0.4,
     metalness: 0.04,
+    emissive: glowColor.clone(),
+    emissiveIntensity: 1.38,
   });
 
   const silhouette = new THREE.Shape();
@@ -325,7 +328,10 @@ function createGhostModel(color, size) {
   rightEye.scale.set(0.9, 1.45, 0.75);
   rightEye.position.set(bodyWidth * 0.22, totalHeight * 0.76 + scallopRadius, bodyDepth / 2 + 0.01);
 
-  ghost.add(shell, leftEye, rightEye);
+  const glowLight = new THREE.PointLight(color, 0.45, size * 5, 2);
+  glowLight.position.set(0, totalHeight * 0.38 + scallopRadius, 0);
+
+  ghost.add(shell, leftEye, rightEye, glowLight);
 
   return ghost;
 }

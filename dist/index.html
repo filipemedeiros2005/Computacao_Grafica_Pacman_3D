@@ -1,13 +1,58 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-PT">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pacman 3D</title>
-    <script type="module" crossorigin src="/assets/index-ClMkfEKd.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CUj115sc.css">
+    <title>Pacman 3D</title>
+    
+    <!-- Mapa de imports para o Three.js -->
+
+
+    <!-- Ligação ao CSS -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+        }
+      }
+    </script>
+    <script type="module" crossorigin src="/assets/index-DxCXzM6D.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CndNUl0I.css">
   </head>
+  
   <body>
-    <div id="app"></div>
+    <!-- 1. Menu Principal -->
+    <div id="mainMenu" class="main-menu">
+      <h1 class="menu-title">Pacman 3D</h1>
+      <div class="menu-buttons">
+        <button id="playButton" class="menu-btn">Jogar</button>
+        <button id="charactersMenuButton" class="menu-btn">Personagens</button>
+        <button id="instructionsButton" class="menu-btn">Instruções</button>
+        <button id="exitButton" class="menu-btn">Sair</button>
+      </div>
+    </div>
+
+    <!-- 2. Janela de Instruções (Modal flutuante) -->
+    <div id="instructionsModal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <h2 class="modal-title">Instruções do Jogo</h2>
+        <div class="modal-body">
+          <p><strong>Controlos:</strong></p>
+          <ul>
+            <li><strong>Tecla 'V':</strong> Alternar entre vista 2D Clássica e 3D</li>
+            <li><strong>Rato (na vista 3D):</strong> Clica e arrasta para rodar a câmara</li>
+          </ul>
+          <p><strong>Objetivo:</strong></p>
+          <p>Come todas as pastilhas do labirinto e evita tocar nos fantasmas para não perderes o jogo!</p>
+        </div>
+        <button id="closeInstructionsButton" class="menu-btn small-btn">Fechar</button>
+      </div>
+    </div>
+
+    <button id="backToMenuButton" class="menu-btn in-game-back-btn hidden">Voltar ao Menu</button>
+    <!-- 3. Aqui é injetado o jogo 3D do Three.js -->
+    <div id="app"></div>
+
+    <!-- Ligação ao JavaScript principal -->
   </body>
 </html>
