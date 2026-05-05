@@ -258,6 +258,7 @@ function createGhostModel(color, size) {
   const scallopCenters = [bodyWidth * 0.28, 0, -bodyWidth * 0.28];
   const glowColor = new THREE.Color(color);
 
+//Material para os fantasmas
   const ghostMaterial = new THREE.MeshStandardMaterial({
     color: glowColor,
     roughness: 0.4,
