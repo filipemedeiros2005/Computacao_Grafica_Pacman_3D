@@ -15,22 +15,13 @@ app.appendChild(renderer.domElement);
 
 // Cena
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x030712); //cor de fundo do ecrã
 
 // Camara
 
 let camera2D, camera3D, cameraAtiva;
 
 // Tira o "const" que estava aqui e usa o camera2D
-camera2D = new THREE.PerspectiveCamera(
-  60, //FOV
-  window.innerWidth / window.innerHeight, //Aspect ratio
-  0.1, //Distancia minima
-  400 //distancia maxima
-);
-// Altera "camera" para "camera2D"
-camera2D.position.set(0, 24, 18); 
-camera2D.lookAt(0, 0, 0); 
+camera2D = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
 
 camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
@@ -83,9 +74,36 @@ const mazeDepth = mazeLayout.length * tileSize;
 const xOffset = -mazeWidth / 2 + tileSize / 2;
 const zOffset = -mazeDepth / 2 + tileSize / 2;
 const ghostLights = [];
+const camera2DMargin = 8;
 
-camera2D.position.set(0, Math.max(26, mazeDepth * 1.1), mazeDepth * 0.8);
-camera2D.lookAt(0, 0, 0);
+function updateCamera2DFraming() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const baseWidth = mazeWidth + camera2DMargin;
+  const baseHeight = mazeDepth + camera2DMargin;
+
+  if (aspect >= baseWidth / baseHeight) {
+    const halfHeight = baseHeight / 2;
+    const halfWidth = halfHeight * aspect;
+    camera2D.left = -halfWidth;
+    camera2D.right = halfWidth;
+    camera2D.top = halfHeight;
+    camera2D.bottom = -halfHeight;
+  } else {
+    const halfWidth = baseWidth / 2;
+    const halfHeight = halfWidth / aspect;
+    camera2D.left = -halfWidth;
+    camera2D.right = halfWidth;
+    camera2D.top = halfHeight;
+    camera2D.bottom = -halfHeight;
+  }
+
+  camera2D.position.set(0, 120, 0);
+  camera2D.up.set(0, 0, -1);
+  camera2D.lookAt(0, 0, 0);
+  camera2D.updateProjectionMatrix();
+}
+
+updateCamera2DFraming();
 
 const wallGeometry = new THREE.BoxGeometry(tileSize, wallHeight, tileSize);
 const wallMaterial = new THREE.MeshStandardMaterial({
@@ -366,8 +384,7 @@ for (const ghostConfig of ghostCells) {
 }
 
 window.addEventListener("resize", () => {
-  camera2D.aspect = window.innerWidth / window.innerHeight;
-  camera2D.updateProjectionMatrix();
+  updateCamera2DFraming();
 
   camera3D.aspect = window.innerWidth / window.innerHeight;
   camera3D.updateProjectionMatrix();
@@ -377,6 +394,13 @@ window.addEventListener("resize", () => {
 });
 
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' || event.key === 'Enter') {
+    if (document.getElementById('mainMenu').classList.contains('hidden')) {
+      returnToMainMenu();
+    }
+    return;
+  }
+
     if (event.key === 'v' || event.key === 'V') {
         is3DView = !is3DView;
         cameraAtiva = is3DView ? camera3D : camera2D;
@@ -543,6 +567,14 @@ const toggleAmbient = document.getElementById('toggle-ambient');
 const toggleDirectional = document.getElementById('toggle-directional');
 const togglePoint = document.getElementById('toggle-point');
 
+function returnToMainMenu() {
+  mainMenu.classList.remove('hidden');
+  backToMenuButton.classList.add('hidden');
+  is3DView = false;
+  cameraAtiva = camera2D;
+  controls.enabled = false;
+}
+
 // Quando se clica em "Jogar"
 playButton.addEventListener('click', () => {
     mainMenu.classList.add('hidden'); // Esconde o menu
@@ -551,8 +583,7 @@ playButton.addEventListener('click', () => {
 
 // Quando se clica em "Voltar ao Menu" (dentro do jogo)
 backToMenuButton.addEventListener('click', () => {
-    mainMenu.classList.remove('hidden'); // Mostra o menu principal novamente
-    backToMenuButton.classList.add('hidden'); // Esconde o botão de voltar
+  returnToMainMenu();
 });
 
 // Quando o jogador clica em "Jogar", escondemos o menu
