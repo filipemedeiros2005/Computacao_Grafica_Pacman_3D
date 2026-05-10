@@ -25,7 +25,9 @@
       <div class="menu-buttons">
         <button id="playButton" class="menu-btn">Jogar</button>
         <button id="charactersMenuButton" class="menu-btn">Personagens</button>
+        <button id="settingsButton" class="menu-btn">Definições</button>
         <button id="instructionsButton" class="menu-btn">Instruções</button>
+        
         <button id="exitButton" class="menu-btn">Sair</button>
       </div>
     </div>
@@ -45,6 +47,31 @@
           <p>Come todas as pastilhas do labirinto e evita os fantasmas para não perderes o jogo!</p>
         </div>
         <button id="closeInstructionsButton" class="menu-btn small-btn">Fechar</button>
+      </div>
+    </div>
+
+    <div id="settingsModal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <h2 class="modal-title">Definições Gráficas</h2>
+        <div class="modal-body">
+          <p><strong>Luzes do Jogo:</strong></p>
+          
+          <div class="setting-item">
+            <label for="toggle-ambient">Luz Ambiente (Global):</label>
+            <input type="checkbox" id="toggle-ambient" checked>
+          </div>
+          
+          <div class="setting-item">
+            <label for="toggle-directional">Luz Direcional (Sombras):</label>
+            <input type="checkbox" id="toggle-directional" checked>
+          </div>
+
+          <div class="setting-item">
+            <label for="toggle-point">Luzes Pontuais (Fantasmas):</label>
+            <input type="checkbox" id="toggle-point" checked>
+          </div>
+        </div>
+        <button id="closeSettingsButton" class="menu-btn small-btn">Fechar</button>
       </div>
     </div>
 

@@ -82,6 +82,7 @@ const mazeWidth = mazeLayout[0].length * tileSize;
 const mazeDepth = mazeLayout.length * tileSize;
 const xOffset = -mazeWidth / 2 + tileSize / 2;
 const zOffset = -mazeDepth / 2 + tileSize / 2;
+const ghostLights = [];
 
 camera2D.position.set(0, Math.max(26, mazeDepth * 1.1), mazeDepth * 0.8);
 camera2D.lookAt(0, 0, 0);
@@ -335,6 +336,7 @@ function createGhostModel(color, size) {
   // O número 10 é a intensidade, e o 5 é a distância até onde a luz chega (podes ajustar ao teu gosto).
   const floorLight = new THREE.PointLight(color, 10, 5); 
   floorLight.position.set(0, 0.5, 0); // Colocada numa posição baixa, perto do chão
+  ghostLights.push(floorLight);
   
   ghost.add(shell, leftEye, rightEye, floorLight);
 
@@ -534,6 +536,12 @@ const playButton = document.getElementById('playButton');
 const charactersMenuButton = document.getElementById('charactersMenuButton');
 // Elemento do novo botão
 const backToMenuButton = document.getElementById('backToMenuButton');
+const settingsButton = document.getElementById('settingsButton');
+const settingsModal = document.getElementById('settingsModal');
+const closeSettingsButton = document.getElementById('closeSettingsButton');
+const toggleAmbient = document.getElementById('toggle-ambient');
+const toggleDirectional = document.getElementById('toggle-directional');
+const togglePoint = document.getElementById('toggle-point');
 
 // Quando se clica em "Jogar"
 playButton.addEventListener('click', () => {
@@ -580,4 +588,34 @@ exitButton.addEventListener('click', () => {
     if (confirm("Tens a certeza que queres sair do jogo?")) {
         window.location.href = "about:blank"; 
     }
+});
+
+settingsButton.addEventListener('click', () => {
+    settingsModal.classList.remove('hidden');
+});
+
+closeSettingsButton.addEventListener('click', () => {
+    settingsModal.classList.add('hidden');
+});
+
+toggleAmbient.addEventListener('change', (event) => {
+    if (typeof ambientLight !== 'undefined') {
+        ambientLight.visible = event.target.checked;
+    }
+});
+
+toggleDirectional.addEventListener('change', (event) => {
+    if (typeof directionalLight !== 'undefined') {
+        directionalLight.visible = event.target.checked;
+    }
+});
+
+togglePoint.addEventListener('change', (event) => {
+  ghostLights.forEach((light) => {
+    light.visible = event.target.checked;
+  });
+});
+
+ghostLights.forEach((light) => {
+  light.visible = togglePoint.checked;
 });
