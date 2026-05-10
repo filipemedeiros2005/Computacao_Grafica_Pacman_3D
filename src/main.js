@@ -243,6 +243,9 @@ function createPacmanModel(size) {
   rightEye.lookAt(rightEye.position.clone().multiplyScalar(2));
   upperHemisphere.add(rightEye);
 
+ // Guardamos as referências das duas metades para as animar mais tarde
+  pacman.userData = { upperHemisphere, lowerHemisphere };
+  
   pacman.add(upperHemisphere, lowerHemisphere);
   return pacman;
 }
@@ -256,15 +259,14 @@ function createGhostModel(color, size) {
   const bodyDepth = size * 0.58;
   const scallopRadius = bodyWidth * 0.15;
   const scallopCenters = [bodyWidth * 0.28, 0, -bodyWidth * 0.28];
-  const glowColor = new THREE.Color(color);
 
-//Material para os fantasmas
   const ghostMaterial = new THREE.MeshStandardMaterial({
-    color: glowColor,
+    color: color,
+    // Reduzimos o emissive para não ser tão néon (ou podes mesmo tirar estas duas linhas)
+    emissive: color,
+    emissiveIntensity: 0.1, 
     roughness: 0.4,
     metalness: 0.04,
-    emissive: glowColor.clone(),
-    emissiveIntensity: 1.38,
   });
 
   const silhouette = new THREE.Shape();
@@ -311,7 +313,6 @@ function createGhostModel(color, size) {
   ghostGeometry.translate(0, 0, -bodyDepth / 2);
 
   const shell = new THREE.Mesh(ghostGeometry, ghostMaterial);
-  // Raise body so the lower scallops are clearly visible above the floor.
   shell.position.y = scallopRadius;
 
   const eyeMaterial = new THREE.MeshStandardMaterial({
@@ -329,10 +330,13 @@ function createGhostModel(color, size) {
   rightEye.scale.set(0.9, 1.45, 0.75);
   rightEye.position.set(bodyWidth * 0.22, totalHeight * 0.76 + scallopRadius, bodyDepth / 2 + 0.01);
 
-  const glowLight = new THREE.PointLight(color, 0.45, size * 5, 2);
-  glowLight.position.set(0, totalHeight * 0.38 + scallopRadius, 0);
-
-  ghost.add(shell, leftEye, rightEye, glowLight);
+  // --- NOVO: LUZ POR BAIXO DO FANTASMA ---
+  // Cria uma luz da mesma cor do fantasma. 
+  // O número 10 é a intensidade, e o 5 é a distância até onde a luz chega (podes ajustar ao teu gosto).
+  const floorLight = new THREE.PointLight(color, 10, 5); 
+  floorLight.position.set(0, 0.5, 0); // Colocada numa posição baixa, perto do chão
+  
+  ghost.add(shell, leftEye, rightEye, floorLight);
 
   return ghost;
 }
@@ -392,21 +396,130 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
+// --- VARIÁVEIS DE MOVIMENTO ---
+const pacmanSpeed = 5.0; // Velocidade do Pac-Man
+const moveDir = new THREE.Vector3(0, 0, 0); // Direção atual
+const nextDir = new THREE.Vector3(0, 0, 0); // Próxima direção que o jogador carregou
+
+// --- CONTROLOS DO TECLADO ---
+window.addEventListener('keydown', (event) => {
+    // Se o menu estiver visível, não deixa o Pac-Man mover-se
+    if (!document.getElementById('mainMenu').classList.contains('hidden')) return;
+
+    // Convertemos a tecla para minúscula para aceitar o CAPS LOCK ligado sem problemas
+    switch(event.key.toLowerCase()) {
+        case 'w':
+        case 'arrowup':    
+            nextDir.set(0, 0, -1); 
+            break;
+        case 's':
+        case 'arrowdown':  
+            nextDir.set(0, 0, 1); 
+            break;
+        case 'a':
+        case 'arrowleft':  
+            nextDir.set(-1, 0, 0); 
+            break;
+        case 'd':
+        case 'arrowright': 
+            nextDir.set(1, 0, 0); 
+            break;
+    }
+});
+
+// --- SISTEMA DE COLISÃO ---
+function checkCollision(newX, newZ) {
+    const radius = tileSize * 0.35; // Um raio ligeiramente menor que o Pac-Man para não prender nas esquinas
+    
+    // Verificamos 5 pontos (centro e os 4 cantos da "caixa" de colisão do Pac-Man)
+    const points = [
+        { x: newX, z: newZ },
+        { x: newX + radius, z: newZ },
+        { x: newX - radius, z: newZ },
+        { x: newX, z: newZ + radius },
+        { x: newX, z: newZ - radius }
+    ];
+
+    for (let p of points) {
+        // Converte a coordenada do mundo 3D para a grelha (matriz) do labirinto
+        const col = Math.floor((p.x - xOffset + tileSize / 2) / tileSize);
+        const row = Math.floor((p.z - zOffset + tileSize / 2) / tileSize);
+
+        // 1. Saiu dos limites do mapa?
+        if (row < 0 || row >= mazeLayout.length || col < 0 || col >= mazeLayout[0].length) return true;
+        
+        // 2. É uma Parede ("1")?
+        if (mazeLayout[row][col] === "1") return true;
+        
+        // 3. É a casa dos Fantasmas ou a porta? (Linhas 8 a 10, Colunas 10 a 14)
+        if (row >= 8 && row <= 10 && col >= 10 && col <= 14) return true;
+    }
+    
+    return false; // Caminho livre!
+}
+
 const clock = new THREE.Clock();
+
+let lastTime = 0; // Para calcularmos o tempo que passou entre frames (deltaTime)
 
 function animate() {
   requestAnimationFrame(animate); 
 
   const t = clock.getElapsedTime();
+  const dt = t - lastTime; // Diferença de tempo exata
+  lastTime = t;
+
   directionalLight.position.x = 10 * Math.cos(t * 0.3);
   directionalLight.position.z = 10 * Math.sin(t * 0.3);
 
-  if (is3DView) {
-    // MOVE O ALVO: A câmara vai seguir o Pacman mantendo a rotação do rato
-    controls.target.lerp(pacman.position, 0.1); // lerp dá um seguimento suave
-    controls.target.y += 0.5; 
+  // --- LÓGICA DO PAC-MAN (Só corre se o menu estiver escondido) ---
+  if (document.getElementById('mainMenu').classList.contains('hidden')) {
+      
+      // 1. Tentar virar para a nova direção (facilita curvar nas esquinas)
+      if (nextDir.lengthSq() > 0) {
+          const targetX = pacman.position.x + nextDir.x * pacmanSpeed * dt;
+          const targetZ = pacman.position.z + nextDir.z * pacmanSpeed * dt;
+          
+          if (!checkCollision(targetX, targetZ)) {
+              moveDir.copy(nextDir); // Assume a nova direção
+              nextDir.set(0,0,0);    // Limpa o input
+          }
+      }
 
-    // IMPORTANTE: Deixa os controlos calcularem a posição da câmara sozinhos
+      // 2. Mover na direção atual
+      let isMoving = false;
+      if (moveDir.lengthSq() > 0) {
+          const targetX = pacman.position.x + moveDir.x * pacmanSpeed * dt;
+          const targetZ = pacman.position.z + moveDir.z * pacmanSpeed * dt;
+          
+          if (!checkCollision(targetX, targetZ)) {
+              pacman.position.x = targetX;
+              pacman.position.z = targetZ;
+              isMoving = true;
+
+              // Rodar o corpo do Pac-Man para apontar para onde anda
+              const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+              pacman.rotation.y = targetAngle; 
+          }
+      }
+
+      // 3. Animação da Boca
+      if (isMoving) {
+          // Oscila usando uma onda seno (abre e fecha rapidamente baseada no tempo)
+          const angle = (Math.sin(t * 15) + 1) * 0.25; 
+          pacman.userData.upperHemisphere.rotation.x = -angle;
+          pacman.userData.lowerHemisphere.rotation.x = angle;
+      } else {
+          // Se estiver parado contra uma parede, a boca fica meio aberta
+          pacman.userData.upperHemisphere.rotation.x = -0.2;
+          pacman.userData.lowerHemisphere.rotation.x = 0.2;
+      }
+  }
+
+  // --- LÓGICA DA CÂMARA 3D ---
+  if (is3DView) {
+    controls.target.lerp(pacman.position, 0.1); 
+    controls.target.y += 0.5; 
     controls.update();
   }
 
