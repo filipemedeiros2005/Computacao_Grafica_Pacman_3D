@@ -245,7 +245,6 @@ function populateCollectibles() {
     }
   }
 
-  const cherriesGroup = new THREE.Group();
   for (let cherryPos of cherryPositions) {
     const cherryModel = createCherryModel();
     const cherryWorld = gridToWorld(cherryPos.row, cherryPos.col);
@@ -255,11 +254,9 @@ function populateCollectibles() {
     const cherryLight = new THREE.PointLight(0xdc2626, 10, 6);
     cherryLight.position.set(0, 0, 0);
     cherryModel.add(cherryLight);
-    cherriesGroup.add(cherryModel);
+    powerPelletsGroup.add(cherryModel);
   }
-  powerPelletsGroup.add(cherriesGroup);
 
-  const orangesGroup = new THREE.Group();
   for (let orangePos of orangePositions) {
     const orangeModel = createOrangeModel();
     const orangeWorld = gridToWorld(orangePos.row, orangePos.col);
@@ -269,11 +266,9 @@ function populateCollectibles() {
     const orangeLight = new THREE.PointLight(0xff9500, 10, 6);
     orangeLight.position.set(0, 0, 0);
     orangeModel.add(orangeLight);
-    orangesGroup.add(orangeModel);
+    powerPelletsGroup.add(orangeModel);
   }
-  powerPelletsGroup.add(orangesGroup);
 
-  const bananasGroup = new THREE.Group();
   for (let bananaPos of bananaPositions) {
     const bananaModel = createBananaModel();
     const bananaWorld = gridToWorld(bananaPos.row, bananaPos.col);
@@ -283,9 +278,8 @@ function populateCollectibles() {
     const bananaLight = new THREE.PointLight(0xffd60a, 10, 6);
     bananaLight.position.set(0, 0, 0);
     bananaModel.add(bananaLight);
-    bananasGroup.add(bananaModel);
+    powerPelletsGroup.add(bananaModel);
   }
-  powerPelletsGroup.add(bananasGroup);
 }
 
 scene.add(pelletsGroup);
@@ -566,6 +560,40 @@ const ghostCells = [
 // --- NOVO: ARRAY DE DADOS DOS FANTASMAS ---
 const ghostsData = [];
 const ghostBaseSpeed = 4.5;
+const ghostTurnChance = 0.32;
+const ghostDecisionEpsilon = tileSize * 0.18;
+const ghostDirections = [
+  new THREE.Vector3(1, 0, 0),
+  new THREE.Vector3(-1, 0, 0),
+  new THREE.Vector3(0, 0, 1),
+  new THREE.Vector3(0, 0, -1),
+];
+
+function getGhostJunctionInfo(position) {
+  const row = Math.round((position.z - zOffset) / tileSize);
+  const col = Math.round((position.x - xOffset) / tileSize);
+  const centerX = xOffset + col * tileSize;
+  const centerZ = zOffset + row * tileSize;
+
+  if (Math.abs(position.x - centerX) > ghostDecisionEpsilon || Math.abs(position.z - centerZ) > ghostDecisionEpsilon) {
+    return null;
+  }
+
+  const validDirs = ghostDirections.filter((direction) => {
+    const sampleX = position.x + direction.x * tileSize * 0.5;
+    const sampleZ = position.z + direction.z * tileSize * 0.5;
+    return !checkGhostCollision(sampleX, sampleZ);
+  });
+
+  return {
+    key: `${row}:${col}`,
+    row,
+    col,
+    centerX,
+    centerZ,
+    validDirs,
+  };
+}
 
 for (const gc of ghostCells) {
   const ghost = createGhostModel(gc.color, tileSize);
@@ -582,7 +610,8 @@ for (const gc of ghostCells) {
       moveDir: new THREE.Vector3(Math.random() > 0.5 ? 1 : -1, 0, 0),
       speed: ghostBaseSpeed,
       isFrightened: false,
-      frightenedTimer: 0
+      frightenedTimer: 0,
+      lastJunctionKey: null,
   });
 }
 
@@ -637,6 +666,7 @@ function resetGameEntities() {
         ghost.speed = ghostBaseSpeed;
         ghost.isFrightened = false;
         ghost.frightenedTimer = 0;
+        ghost.lastJunctionKey = null;
         ghost.mesh.children[0].material.color.setHex(ghost.baseColor);
         ghost.mesh.children[0].material.emissive.setHex(ghost.baseColor);
     });
@@ -930,6 +960,21 @@ function animate() {
               }
           }
 
+              const junctionInfo = isGhostHouse ? null : getGhostJunctionInfo(ghost.mesh.position);
+              if (!junctionInfo) {
+                ghost.lastJunctionKey = null;
+              } else if (junctionInfo.key !== ghost.lastJunctionKey) {
+                const backDir = ghost.moveDir.clone().negate();
+                const forwardDir = ghostDirections.find((direction) => direction.equals(ghost.moveDir));
+                const sideDirs = junctionInfo.validDirs.filter((direction) => !direction.equals(backDir) && !direction.equals(forwardDir));
+
+                if (sideDirs.length > 0 && Math.random() < ghostTurnChance) {
+                  ghost.moveDir.copy(sideDirs[Math.floor(Math.random() * sideDirs.length)]);
+                }
+
+                ghost.lastJunctionKey = junctionInfo.key;
+              }
+
           // 3. Movimento Normal do Fantasma pelo Labirinto
           let ghostTargetX = ghost.mesh.position.x + ghost.moveDir.x * ghost.speed * dt;
           let ghostTargetZ = ghost.mesh.position.z + ghost.moveDir.z * ghost.speed * dt;
@@ -951,7 +996,7 @@ function animate() {
               if (possibleDirs.length === 0) possibleDirs = validDirs; 
               
               if (possibleDirs.length > 0) {
-                  ghost.moveDir = possibleDirs[Math.floor(Math.random() * possibleDirs.length)];
+                  ghost.moveDir.copy(possibleDirs[Math.floor(Math.random() * possibleDirs.length)]);
               }
           } else {
               ghost.mesh.position.x = ghostTargetX;
