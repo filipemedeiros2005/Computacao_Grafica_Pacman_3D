@@ -230,6 +230,10 @@ function populateCollectibles() {
           const pp = new THREE.Mesh(powerPelletGeo, powerPelletMat);
           pp.userData.collectibleType = 'power';
           pp.position.set(worldPos.x, 0.6, worldPos.z);
+          // Adicionar luz ao power pellet
+          const ppLight = new THREE.PointLight(0xffffff, 12, 6);
+          ppLight.position.set(0, 0, 0);
+          pp.add(ppLight);
           powerPelletsGroup.add(pp);
         } else {
           const pellet = new THREE.Mesh(pelletGeometry, pelletMaterial);
@@ -247,6 +251,10 @@ function populateCollectibles() {
     const cherryWorld = gridToWorld(cherryPos.row, cherryPos.col);
     cherryModel.position.set(cherryWorld.x, 0.5, cherryWorld.z);
     cherryModel.userData.collectibleType = 'cherry';
+    // Adicionar luz à cereja
+    const cherryLight = new THREE.PointLight(0xdc2626, 10, 6);
+    cherryLight.position.set(0, 0, 0);
+    cherryModel.add(cherryLight);
     cherriesGroup.add(cherryModel);
   }
   powerPelletsGroup.add(cherriesGroup);
@@ -257,6 +265,10 @@ function populateCollectibles() {
     const orangeWorld = gridToWorld(orangePos.row, orangePos.col);
     orangeModel.position.set(orangeWorld.x, 0.5, orangeWorld.z);
     orangeModel.userData.collectibleType = 'orange';
+    // Adicionar luz à laranja
+    const orangeLight = new THREE.PointLight(0xff9500, 10, 6);
+    orangeLight.position.set(0, 0, 0);
+    orangeModel.add(orangeLight);
     orangesGroup.add(orangeModel);
   }
   powerPelletsGroup.add(orangesGroup);
@@ -267,6 +279,10 @@ function populateCollectibles() {
     const bananaWorld = gridToWorld(bananaPos.row, bananaPos.col);
     bananaModel.position.set(bananaWorld.x, 0.5, bananaWorld.z);
     bananaModel.userData.collectibleType = 'banana';
+    // Adicionar luz à banana
+    const bananaLight = new THREE.PointLight(0xffd60a, 10, 6);
+    bananaLight.position.set(0, 0, 0);
+    bananaModel.add(bananaLight);
     bananasGroup.add(bananaModel);
   }
   powerPelletsGroup.add(bananasGroup);
