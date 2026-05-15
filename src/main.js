@@ -7,6 +7,7 @@ const app = document.querySelector("#app");
 let controls;
 let is3DView = false;
 let isFreeLook = false;
+let isFreeNavigationMode = false;
 let cameraAtiva;
 const ghostLights = [];
 
@@ -31,6 +32,7 @@ controls.minDistance = 2;
 controls.maxDistance = 25;
 controls.maxPolarAngle = Math.PI / 2;
 controls.minPolarAngle = 0;
+controls.zoomSpeed = 0.8; // Reduz a sensibilidade do zoom
 
 // Luzes
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
@@ -97,6 +99,52 @@ function updateCamera2DFraming() {
 }
 updateCamera2DFraming();
 
+// --- NOVO: ZOOM SUAVE PARA CÂMARA 2D ---
+const camera2DZoom = {
+  minZoom: 0.5,
+  maxZoom: 3,
+  currentZoom: 1,
+};
+
+function updateCamera2DZoom() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const baseWidth = (mazeWidth + 8) / camera2DZoom.currentZoom;
+  const baseHeight = (mazeDepth + 8) / camera2DZoom.currentZoom;
+
+  if (aspect >= baseWidth / baseHeight) {
+    const halfHeight = baseHeight / 2;
+    const halfWidth = halfHeight * aspect;
+    camera2D.left = -halfWidth;
+    camera2D.right = halfWidth;
+    camera2D.top = halfHeight;
+    camera2D.bottom = -halfHeight;
+  } else {
+    const halfWidth = baseWidth / 2;
+    const halfHeight = halfWidth / aspect;
+    camera2D.left = -halfWidth;
+    camera2D.right = halfWidth;
+    camera2D.top = halfHeight;
+    camera2D.bottom = -halfHeight;
+  }
+
+  camera2D.updateProjectionMatrix();
+}
+
+renderer.domElement.addEventListener('wheel', (event) => {
+  event.preventDefault();
+  
+  // Zoom só funciona quando não está em modo de navegação livre
+  if (isFreeNavigationMode) {
+    return;
+  }
+
+  // Calcula o novo zoom de forma suave
+  const zoomDelta = event.deltaY > 0 ? 0.9 : 1.1; // Reduz de forma suave
+  camera2DZoom.currentZoom = Math.max(camera2DZoom.minZoom, Math.min(camera2DZoom.maxZoom, camera2DZoom.currentZoom * zoomDelta));
+  
+  updateCamera2DZoom();
+}, { passive: false });
+
 const wallGeometry = new THREE.BoxGeometry(tileSize, wallHeight, tileSize);
 const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.45, metalness: 0.05 });
 const wallsGroup = new THREE.Group();
@@ -160,35 +208,70 @@ function generateValidPositions(count = 3, excludePositions = []) {
   return selectedPositions;
 }
 
-const cherryPositions = generateValidPositions(3);
-const orangePositions = generateValidPositions(2, cherryPositions);
-const bananaPositions = generateValidPositions(1, cherryPositions.concat(orangePositions));
+function populateCollectibles() {
+  pelletsGroup.clear();
+  powerPelletsGroup.clear();
 
-for (let row = 0; row < mazeLayout.length; row += 1) {
-  for (let col = 0; col < mazeLayout[row].length; col += 1) {
-    const isGhostHouse = (row === 9 || row === 10) && (col >= 10 && col <= 14);
-    const isGhostDoor = (row === 8 && col === 12);
-    const isCherryTile = cherryPositions.some(pos => pos.row === row && pos.col === col);
-    const isOrangeTile = orangePositions.some(pos => pos.row === row && pos.col === col);
-    const isBananaTile = bananaPositions.some(pos => pos.row === row && pos.col === col);
+  const cherryPositions = generateValidPositions(3);
+  const orangePositions = generateValidPositions(2, cherryPositions);
+  const bananaPositions = generateValidPositions(1, cherryPositions.concat(orangePositions));
 
-    if (mazeLayout[row][col] === "0" && !isGhostHouse && !isGhostDoor && !isCherryTile && !isOrangeTile && !isBananaTile) {
-      const worldPos = gridToWorld(row, col);
-      // Os 4 cantos do labirinto recebem Power Pellets
-      if ((row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23)) {
+  for (let row = 0; row < mazeLayout.length; row += 1) {
+    for (let col = 0; col < mazeLayout[row].length; col += 1) {
+      const isGhostHouse = (row === 9 || row === 10) && (col >= 10 && col <= 14);
+      const isGhostDoor = (row === 8 && col === 12);
+      const isCherryTile = cherryPositions.some(pos => pos.row === row && pos.col === col);
+      const isOrangeTile = orangePositions.some(pos => pos.row === row && pos.col === col);
+      const isBananaTile = bananaPositions.some(pos => pos.row === row && pos.col === col);
+
+      if (mazeLayout[row][col] === "0" && !isGhostHouse && !isGhostDoor && !isCherryTile && !isOrangeTile && !isBananaTile) {
+        const worldPos = gridToWorld(row, col);
+        if ((row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23)) {
           const pp = new THREE.Mesh(powerPelletGeo, powerPelletMat);
           pp.userData.collectibleType = 'power';
           pp.position.set(worldPos.x, 0.6, worldPos.z);
           powerPelletsGroup.add(pp);
-      } else {
+        } else {
           const pellet = new THREE.Mesh(pelletGeometry, pelletMaterial);
           pellet.userData.collectibleType = 'normal';
           pellet.position.set(worldPos.x, 0.6, worldPos.z);
           pelletsGroup.add(pellet);
+        }
       }
     }
   }
+
+  const cherriesGroup = new THREE.Group();
+  for (let cherryPos of cherryPositions) {
+    const cherryModel = createCherryModel();
+    const cherryWorld = gridToWorld(cherryPos.row, cherryPos.col);
+    cherryModel.position.set(cherryWorld.x, 0.5, cherryWorld.z);
+    cherryModel.userData.collectibleType = 'cherry';
+    cherriesGroup.add(cherryModel);
+  }
+  powerPelletsGroup.add(cherriesGroup);
+
+  const orangesGroup = new THREE.Group();
+  for (let orangePos of orangePositions) {
+    const orangeModel = createOrangeModel();
+    const orangeWorld = gridToWorld(orangePos.row, orangePos.col);
+    orangeModel.position.set(orangeWorld.x, 0.5, orangeWorld.z);
+    orangeModel.userData.collectibleType = 'orange';
+    orangesGroup.add(orangeModel);
+  }
+  powerPelletsGroup.add(orangesGroup);
+
+  const bananasGroup = new THREE.Group();
+  for (let bananaPos of bananaPositions) {
+    const bananaModel = createBananaModel();
+    const bananaWorld = gridToWorld(bananaPos.row, bananaPos.col);
+    bananaModel.position.set(bananaWorld.x, 0.5, bananaWorld.z);
+    bananaModel.userData.collectibleType = 'banana';
+    bananasGroup.add(bananaModel);
+  }
+  powerPelletsGroup.add(bananasGroup);
 }
+
 scene.add(pelletsGroup);
 scene.add(powerPelletsGroup);
 
@@ -344,38 +427,7 @@ function createBananaModel() {
   return banana;
 }
 
-// Criar 3 cerejas em posições aleatórias
-const cherriesGroup = new THREE.Group();
-for (let cherryPos of cherryPositions) {
-  const cherryModel = createCherryModel();
-  const cherryWorld = gridToWorld(cherryPos.row, cherryPos.col);
-  cherryModel.position.set(cherryWorld.x, 0.5, cherryWorld.z);
-  cherryModel.userData.collectibleType = 'cherry';
-  cherriesGroup.add(cherryModel);
-}
-powerPelletsGroup.add(cherriesGroup);
-
-// Criar 2 laranjas em posições aleatórias
-const orangesGroup = new THREE.Group();
-for (let orangePos of orangePositions) {
-  const orangeModel = createOrangeModel();
-  const orangeWorld = gridToWorld(orangePos.row, orangePos.col);
-  orangeModel.position.set(orangeWorld.x, 0.5, orangeWorld.z);
-  orangeModel.userData.collectibleType = 'orange';
-  orangesGroup.add(orangeModel);
-}
-powerPelletsGroup.add(orangesGroup);
-
-// Criar 1 banana em posição aleatória
-const bananasGroup = new THREE.Group();
-for (let bananaPos of bananaPositions) {
-  const bananaModel = createBananaModel();
-  const bananaWorld = gridToWorld(bananaPos.row, bananaPos.col);
-  bananaModel.position.set(bananaWorld.x, 0.5, bananaWorld.z);
-  bananaModel.userData.collectibleType = 'banana';
-  bananasGroup.add(bananaModel);
-}
-powerPelletsGroup.add(bananasGroup);
+populateCollectibles();
 
 function gridToWorld(row, col) {
   return { x: xOffset + col * tileSize, z: zOffset + row * tileSize };
@@ -509,6 +561,8 @@ for (const gc of ghostCells) {
   ghostsData.push({
       mesh: ghost,
       baseColor: gc.color,
+      startRow: gc.row,
+      startCol: gc.col,
       moveDir: new THREE.Vector3(Math.random() > 0.5 ? 1 : -1, 0, 0),
       speed: ghostBaseSpeed,
       isFrightened: false,
@@ -519,6 +573,7 @@ for (const gc of ghostCells) {
 // Resize
 window.addEventListener("resize", () => {
   updateCamera2DFraming();
+  updateCamera2DZoom(); // Mantém o zoom ao redimensionar a janela
   camera3D.aspect = window.innerWidth / window.innerHeight;
   camera3D.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -530,14 +585,99 @@ const pacmanSpeed = 5.0;
 const moveDir = new THREE.Vector3(0, 0, 0);
 const nextDir = new THREE.Vector3(0, 0, 0);
 
+function configureControlsForGameplayView() {
+    controls.enablePan = false;
+    controls.minDistance = 2;
+    controls.maxDistance = 25;
+    controls.maxPolarAngle = Math.PI / 2;
+    controls.minPolarAngle = 0;
+}
+
+function configureControlsForFreeNavigation() {
+    controls.enablePan = true;
+    controls.minDistance = 1.5;
+    controls.maxDistance = Math.max(mazeWidth, mazeDepth) * 1.2;
+    controls.maxPolarAngle = Math.PI - 0.05;
+    controls.minPolarAngle = 0.05;
+}
+
+function resetGameEntities() {
+    const startPos = gridToWorld(12, 12);
+    pacman.position.set(startPos.x, 0.5, startPos.z);
+    pacman.rotation.y = 0;
+    moveDir.set(0, 0, 0);
+    nextDir.set(0, 0, 0);
+
+    if (pacman.userData.upperHemisphere && pacman.userData.lowerHemisphere) {
+        pacman.userData.upperHemisphere.rotation.x = -0.32;
+        pacman.userData.lowerHemisphere.rotation.x = 0.32;
+    }
+
+    ghostsData.forEach((ghost) => {
+        const spawnPos = gridToWorld(ghost.startRow, ghost.startCol);
+        ghost.mesh.position.set(spawnPos.x, 0.5, spawnPos.z);
+        ghost.mesh.rotation.y = 0;
+        ghost.moveDir.set(Math.random() > 0.5 ? 1 : -1, 0, 0);
+        ghost.speed = ghostBaseSpeed;
+        ghost.isFrightened = false;
+        ghost.frightenedTimer = 0;
+        ghost.mesh.children[0].material.color.setHex(ghost.baseColor);
+        ghost.mesh.children[0].material.emissive.setHex(ghost.baseColor);
+    });
+
+    populateCollectibles();
+}
+
+function enterGameplayMode() {
+    const mainMenu = document.getElementById('mainMenu');
+    if (mainMenu) mainMenu.classList.add('hidden');
+
+    const backToMenuButton = document.getElementById('backToMenuButton');
+    if (backToMenuButton) backToMenuButton.classList.remove('hidden');
+
+    isFreeNavigationMode = false;
+    is3DView = false;
+    cameraAtiva = camera2D;
+    camera2DZoom.currentZoom = 1; // Reset do zoom
+    updateCamera2DZoom();
+    configureControlsForGameplayView();
+    if (controls) controls.enabled = false;
+}
+
+function enterFreeNavigationMode() {
+    resetGameEntities();
+
+    const mainMenu = document.getElementById('mainMenu');
+    if (mainMenu) mainMenu.classList.add('hidden');
+
+    const backToMenuButton = document.getElementById('backToMenuButton');
+    if (backToMenuButton) backToMenuButton.classList.remove('hidden');
+
+    isFreeNavigationMode = true;
+    is3DView = true;
+    cameraAtiva = camera3D;
+    isFreeLook = true;
+
+    const toggleFreeLook = document.getElementById('toggle-freelook');
+    if (toggleFreeLook) toggleFreeLook.checked = true;
+
+    configureControlsForFreeNavigation();
+
+    const freeNavTarget = new THREE.Vector3(0, wallHeight * 0.45, 0);
+    controls.target.copy(freeNavTarget);
+    camera3D.position.set(0, Math.max(mazeWidth, mazeDepth) * 0.65, Math.max(mazeWidth, mazeDepth) * 0.5);
+    camera3D.lookAt(freeNavTarget);
+    controls.enabled = true;
+    controls.update();
+}
+
 window.addEventListener('keydown', (event) => {
     const mainMenu = document.getElementById('mainMenu');
     
     // Controlos do Menu e Atalhos
     if (event.key === 'Escape' || event.key === 'Enter') {
         if (!mainMenu.classList.contains('hidden') && event.key === 'Enter') {
-            mainMenu.classList.add('hidden');
-            document.getElementById('backToMenuButton').classList.remove('hidden');
+            enterGameplayMode();
         } else if (mainMenu.classList.contains('hidden') && event.key === 'Escape') {
             returnToMainMenu();
         }
@@ -547,13 +687,18 @@ window.addEventListener('keydown', (event) => {
     // Se o menu estiver visível, não processa movimentos nem câmara
     if (!mainMenu.classList.contains('hidden')) return;
 
+    // Modo de navegação livre bloqueia a lógica de jogo por teclado
+    if (isFreeNavigationMode) {
+        return;
+    }
+
     // Alternar Câmara (V)
     if (event.key.toLowerCase() === 'v') {
         is3DView = !is3DView;
         cameraAtiva = is3DView ? camera3D : camera2D;
-        
+
         if (is3DView) {
-            // Posiciona a câmara imediatamente atrás para não iniciar dentro do chão
+            configureControlsForGameplayView();
             const offset = new THREE.Vector3(0, 12, -16).applyAxisAngle(new THREE.Vector3(0, 1, 0), pacman.rotation.y);
             camera3D.position.copy(pacman.position).add(offset);
             camera3D.lookAt(pacman.position.x, pacman.position.y, pacman.position.z);
@@ -650,9 +795,9 @@ function animate() {
   directionalLight.position.x = 10 * Math.cos(t * 0.3);
   directionalLight.position.z = 10 * Math.sin(t * 0.3);
 
-  // SÓ PROCESSA O MOVIMENTO SE O JOGO ESTIVER ATIVO
+  // Só processa gameplay quando o menu está fechado e o modo livre está desligado
   const mainMenu = document.getElementById('mainMenu');
-  if (mainMenu && mainMenu.classList.contains('hidden')) {
+  if (mainMenu && mainMenu.classList.contains('hidden') && !isFreeNavigationMode) {
       
       if (nextDir.lengthSq() > 0) {
           const targetX = pacman.position.x + nextDir.x * pacmanSpeed * dt;
@@ -833,7 +978,10 @@ function animate() {
 
   // CÂMARA 3D
   if (is3DView) {
-      if (isFreeLook && controls) {
+      if (isFreeNavigationMode && controls) {
+          controls.enabled = true;
+          controls.update();
+      } else if (isFreeLook && controls) {
           controls.enabled = true;
           controls.target.copy(pacman.position);
           controls.update();
@@ -855,6 +1003,7 @@ animate();
 
 // --- LÓGICA DO MENU E DEFINIÇÕES ---
 const playButton = document.getElementById('playButton');
+const freeNavigationButton = document.getElementById('freeNavigationButton');
 const charactersMenuButton = document.getElementById('charactersMenuButton');
 const backToMenuButton = document.getElementById('backToMenuButton');
 
@@ -876,16 +1025,17 @@ function returnToMainMenu() {
     const mainMenu = document.getElementById('mainMenu');
     if (mainMenu) mainMenu.classList.remove('hidden');
     if (backToMenuButton) backToMenuButton.classList.add('hidden');
+    isFreeNavigationMode = false;
     is3DView = false;
     cameraAtiva = camera2D;
+    camera2DZoom.currentZoom = 1; // Reset do zoom
+    updateCamera2DZoom();
+    configureControlsForGameplayView();
     if (controls) controls.enabled = false;
 }
 
-if (playButton) playButton.onclick = () => {
-    const mainMenu = document.getElementById('mainMenu');
-    if (mainMenu) mainMenu.classList.add('hidden');
-    if (backToMenuButton) backToMenuButton.classList.remove('hidden');
-};
+if (playButton) playButton.onclick = enterGameplayMode;
+if (freeNavigationButton) freeNavigationButton.onclick = enterFreeNavigationMode;
 if (backToMenuButton) backToMenuButton.onclick = returnToMainMenu;
 if (charactersMenuButton) charactersMenuButton.onclick = () => window.location.href = './characters.html';
 if (exitButton) exitButton.onclick = () => { if(confirm("Tens a certeza que queres sair do jogo?")) window.location.href = "about:blank"; };
@@ -904,6 +1054,13 @@ if (togglePoint) {
 }
 if (toggleFreeLook) {
     toggleFreeLook.onchange = (e) => {
+        if (isFreeNavigationMode) {
+            e.target.checked = true;
+            isFreeLook = true;
+            if (controls) controls.enabled = true;
+            return;
+        }
+
         isFreeLook = e.target.checked;
         if (is3DView && controls) controls.enabled = isFreeLook;
     };
