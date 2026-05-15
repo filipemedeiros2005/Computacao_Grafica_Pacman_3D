@@ -1,52 +1,46 @@
 import * as THREE from "three";
 import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
 const app = document.querySelector("#app");
 
-
-//Variáveis de controlo da camara
+// Variáveis Globais
 let controls;
-let pacmanUltimaPosicao = new THREE.Vector3();
+let is3DView = false;
+let isFreeLook = false;
+let cameraAtiva;
+const ghostLights = [];
 
 // Renderer
-const renderer = new THREE.WebGLRenderer({ antialias: true }); //antilias faz com que as arestas sejam mais lisas
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight); //Tamanho da janela
+renderer.setSize(window.innerWidth, window.innerHeight);
 app.appendChild(renderer.domElement);
 
 // Cena
 const scene = new THREE.Scene();
 
-// Camara
-
-let camera2D, camera3D, cameraAtiva;
-
-// Tira o "const" que estava aqui e usa o camera2D
-camera2D = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
-
-camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-
-// Configurar o OrbitControls na câmera 3D
-controls = new OrbitControls(camera3D, renderer.domElement);
-controls.enabled = false; // Desligado na visão 2D
-controls.enablePan = false; // Impede o jogador de arrastar a câmera para longe do Pacman com o botão direito
-controls.minDistance = 2; // Distância mínima do zoom
-controls.maxDistance = 15; // Distância máxima do zoom
-controls.maxPolarAngle = Math.PI / 2; 
-controls.minPolarAngle = 0; // 0 é exatamente por cima, Math.PI/2 é de lado
-
+// Câmaras
+const camera2D = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
+const camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 cameraAtiva = camera2D;
-let is3DView = false;
+
+controls = new OrbitControls(camera3D, renderer.domElement);
+controls.enabled = false;
+controls.enablePan = false;
+controls.minDistance = 2;
+controls.maxDistance = 25;
+controls.maxPolarAngle = Math.PI / 2;
+controls.minPolarAngle = 0;
 
 // Luzes
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); //luz de ambiente ilumina tudo igualmente com luz branca
-scene.add(ambientLight); //adicionar luz à cena
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9); //garante que os raios chegue todos paralelos
-directionalLight.position.set(10, 20, 10); //Defie de onde vem a luz
-scene.add(directionalLight); //adicionar à cena
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+directionalLight.position.set(10, 20, 10);
+scene.add(directionalLight);
 
-// Layout manual para garantir um nível sempre jogável e consistente.
-// 1 = parede, 0 = caminho.
+// Labirinto
 const mazeLayout = [
   "1111111111111111111111111",
   "1000000000001000000000001",
@@ -73,10 +67,9 @@ const mazeWidth = mazeLayout[0].length * tileSize;
 const mazeDepth = mazeLayout.length * tileSize;
 const xOffset = -mazeWidth / 2 + tileSize / 2;
 const zOffset = -mazeDepth / 2 + tileSize / 2;
-const ghostLights = [];
-const camera2DMargin = 8;
 
 function updateCamera2DFraming() {
+  const camera2DMargin = 8;
   const aspect = window.innerWidth / window.innerHeight;
   const baseWidth = mazeWidth + camera2DMargin;
   const baseHeight = mazeDepth + camera2DMargin;
@@ -102,157 +95,114 @@ function updateCamera2DFraming() {
   camera2D.lookAt(0, 0, 0);
   camera2D.updateProjectionMatrix();
 }
-
 updateCamera2DFraming();
 
 const wallGeometry = new THREE.BoxGeometry(tileSize, wallHeight, tileSize);
-const wallMaterial = new THREE.MeshStandardMaterial({
-  color: 0x1d4ed8,
-  roughness: 0.45,
-  metalness: 0.05,
-});
-
+const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.45, metalness: 0.05 });
 const wallsGroup = new THREE.Group();
 
 for (let row = 0; row < mazeLayout.length; row += 1) {
   for (let col = 0; col < mazeLayout[row].length; col += 1) {
     if (mazeLayout[row][col] === "1") {
       const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-      wall.position.set(
-        xOffset + col * tileSize,
-        wallHeight / 2,
-        zOffset + row * tileSize
-      );
+      wall.position.set(xOffset + col * tileSize, wallHeight / 2, zOffset + row * tileSize);
       wallsGroup.add(wall);
     }
   }
 }
-
 scene.add(wallsGroup);
 
 const floorGeometry = new THREE.PlaneGeometry(mazeWidth + 2, mazeDepth + 2);
-const floorMaterial = new THREE.MeshStandardMaterial({
-  color: 0x111827,
-  roughness: 0.95,
-  metalness: 0,
-});
+const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.95, metalness: 0 });
 const floor = new THREE.Mesh(floorGeometry, floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-// --- CRIAÇÃO DAS PASTILHAS (PELLETS) ---
-const pelletGeometry = new THREE.SphereGeometry(0.24, 8, 8); // Mantém o tamanho que escolheste!
-const pelletMaterial = new THREE.MeshStandardMaterial({
-  color: 0xffddaa,
-  roughness: 0.5,
-  metalness: 0.1,
-});
-
+// Pastilhas (Pellets)
+const pelletGeometry = new THREE.SphereGeometry(0.24, 8, 8);
+const pelletMaterial = new THREE.MeshStandardMaterial({ color: 0xffddaa, roughness: 0.5, metalness: 0.1 });
 const pelletsGroup = new THREE.Group();
 
-// Percorrer o labirinto todo
+// --- NOVO: GRUPO DOS POWER PELLETS E CEREJA ---
+const powerPelletsGroup = new THREE.Group();
+const powerPelletGeo = new THREE.SphereGeometry(0.5, 16, 16);
+const powerPelletMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
+
 for (let row = 0; row < mazeLayout.length; row += 1) {
   for (let col = 0; col < mazeLayout[row].length; col += 1) {
-    
-    // Identificar a zona interior da casa dos fantasmas (linhas 9 e 10, colunas 10 a 14)
     const isGhostHouse = (row === 9 || row === 10) && (col >= 10 && col <= 14);
-    
-    // Identificar o espaço da porta de saída (linha 8, coluna 12)
     const isGhostDoor = (row === 8 && col === 12);
 
-    // Só cria a pastilha se for caminho ("0") E não for a casa E não for a porta
     if (mazeLayout[row][col] === "0" && !isGhostHouse && !isGhostDoor) {
-      const pellet = new THREE.Mesh(pelletGeometry, pelletMaterial);
-      
       const worldPos = gridToWorld(row, col);
-      
-      // Colocamos o Y a 0.6 para não ficar enterrada (ajusta se for preciso)
-      pellet.position.set(worldPos.x, 0.6, worldPos.z);
-      
-      pelletsGroup.add(pellet);
+      // Os 4 cantos do labirinto recebem Power Pellets
+      if ((row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23)) {
+          const pp = new THREE.Mesh(powerPelletGeo, powerPelletMat);
+          pp.position.set(worldPos.x, 0.6, worldPos.z);
+          powerPelletsGroup.add(pp);
+      } else {
+          const pellet = new THREE.Mesh(pelletGeometry, pelletMaterial);
+          pellet.position.set(worldPos.x, 0.6, worldPos.z);
+          pelletsGroup.add(pellet);
+      }
     }
   }
 }
-
 scene.add(pelletsGroup);
+scene.add(powerPelletsGroup);
+
+// --- NOVO: CEREJA ---
+const cherryGroup = new THREE.Group();
+const cherryGeo = new THREE.SphereGeometry(0.3, 16, 16);
+const cherryMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
+const c1 = new THREE.Mesh(cherryGeo, cherryMat); c1.position.set(-0.25, 0.3, 0);
+const c2 = new THREE.Mesh(cherryGeo, cherryMat); c2.position.set(0.25, 0.3, 0);
+cherryGroup.add(c1, c2);
+const cherryWorld = gridToWorld(13, 12); 
+cherryGroup.position.set(cherryWorld.x, 0.5, cherryWorld.z);
+scene.add(cherryGroup);
 
 function gridToWorld(row, col) {
-  return {
-    x: xOffset + col * tileSize,
-    z: zOffset + row * tileSize,
-  };
+  return { x: xOffset + col * tileSize, z: zOffset + row * tileSize };
 }
 
+// Personagens
 function createPacmanModel(size) {
   const pacman = new THREE.Group();
   const radius = size * 0.38;
-  const baseLift = radius;
-
-  // Carregador de texturas do Three.js
   const textureLoader = new THREE.TextureLoader();
+  const pacmanMaterial = new THREE.MeshStandardMaterial({ color: 0xffd60a, roughness: 0.35, metalness: 0.05 });
 
-  const pacmanMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffd60a,
-    roughness: 0.35,
-    metalness: 0.05,
-  });
-
-  // Metade superior
-  const upperHemisphere = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-    pacmanMaterial
-  );
-  // Rodar no eixo X para a boca abrir virada para a frente (+Z)
+  const upperHemisphere = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), pacmanMaterial);
   upperHemisphere.rotation.x = -0.32;
-  upperHemisphere.position.y = baseLift;
+  upperHemisphere.position.y = radius;
 
-  // Metade inferior
-  const lowerHemisphere = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
-    pacmanMaterial
-  );
-  // Rodar no eixo X simetricamente
+  const lowerHemisphere = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), pacmanMaterial);
   lowerHemisphere.rotation.x = 0.32;
-  lowerHemisphere.position.y = baseLift;
+  lowerHemisphere.position.y = radius;
 
-  // --- CORREÇÃO DA BOCA ---
-  // Criar o fundo da boca (duas tampas circulares) para não ser transparente, usando a textura
   const mouthTexture = textureLoader.load('./img/pacman_fundo_para_a_boca.png');
   const mouthMaterial = new THREE.MeshBasicMaterial({ map: mouthTexture });
   const capGeometry = new THREE.CircleGeometry(radius, 32);
 
-  // Tampa para a parte de cima da boca (virada para baixo)
   const upperCap = new THREE.Mesh(capGeometry, mouthMaterial);
   upperCap.rotation.x = Math.PI / 2; 
   upperHemisphere.add(upperCap);
 
-  // Tampa para a parte de baixo da boca (virada para cima)
   const lowerCap = new THREE.Mesh(capGeometry, mouthMaterial);
   lowerCap.rotation.x = -Math.PI / 2;
   lowerHemisphere.add(lowerCap);
 
-// --- CORREÇÃO DOS OLHOS ---
   const eyeTexture = textureLoader.load('./img/pacman_olho.png');
-  
-  // Adicionamos alphaTest para cortar o fundo transparente e DoubleSide para se ver de trás
-  const eyeMaterial = new THREE.MeshBasicMaterial({ 
-    map: eyeTexture, 
-    transparent: true,
-    alphaTest: 0.1, 
-    side: THREE.DoubleSide 
-  });
-  
-  const eyeSize = radius * 0.85; // Aumenta este multiplicador ao teu gosto
+  const eyeMaterial = new THREE.MeshBasicMaterial({ map: eyeTexture, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide });
+  const eyeSize = radius * 0.85;
   const eyeGeometry = new THREE.PlaneGeometry(eyeSize, eyeSize);
 
-  // Função auxiliar para colar os olhos exatamente na superfície
   function putOnSurface(x, y, z) {
-    // Reduzi o multiplicador para 1.005 para ficar quase colado à esfera
     return new THREE.Vector3(x, y, z).normalize().multiplyScalar(radius * 1.005);
   }
 
   const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-  // Ajustei os vetores para ficarem mais naturais no rosto
   leftEye.position.copy(putOnSurface(-0.8, 1.0, 1.8)); 
   leftEye.lookAt(leftEye.position.clone().multiplyScalar(2)); 
   upperHemisphere.add(leftEye); 
@@ -262,9 +212,7 @@ function createPacmanModel(size) {
   rightEye.lookAt(rightEye.position.clone().multiplyScalar(2));
   upperHemisphere.add(rightEye);
 
- // Guardamos as referências das duas metades para as animar mais tarde
   pacman.userData = { upperHemisphere, lowerHemisphere };
-  
   pacman.add(upperHemisphere, lowerHemisphere);
   return pacman;
 }
@@ -279,66 +227,29 @@ function createGhostModel(color, size) {
   const scallopRadius = bodyWidth * 0.15;
   const scallopCenters = [bodyWidth * 0.28, 0, -bodyWidth * 0.28];
 
-  const ghostMaterial = new THREE.MeshStandardMaterial({
-    color: color,
-    // Reduzimos o emissive para não ser tão néon (ou podes mesmo tirar estas duas linhas)
-    emissive: color,
-    emissiveIntensity: 0.1, 
-    roughness: 0.4,
-    metalness: 0.04,
-  });
+  const ghostMaterial = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.1, roughness: 0.4, metalness: 0.04 });
 
   const silhouette = new THREE.Shape();
   silhouette.moveTo(-halfWidth, 0);
   silhouette.lineTo(-halfWidth, sideTopY);
-  silhouette.bezierCurveTo(
-    -halfWidth * 0.95,
-    totalHeight * 0.86,
-    -halfWidth * 0.48,
-    totalHeight * 1.03,
-    0,
-    totalHeight
-  );
-  silhouette.bezierCurveTo(
-    halfWidth * 0.48,
-    totalHeight * 1.03,
-    halfWidth * 0.95,
-    totalHeight * 0.86,
-    halfWidth,
-    sideTopY
-  );
+  silhouette.bezierCurveTo(-halfWidth * 0.95, totalHeight * 0.86, -halfWidth * 0.48, totalHeight * 1.03, 0, totalHeight);
+  silhouette.bezierCurveTo(halfWidth * 0.48, totalHeight * 1.03, halfWidth * 0.95, totalHeight * 0.86, halfWidth, sideTopY);
   silhouette.lineTo(halfWidth, 0);
   silhouette.lineTo(scallopCenters[0] + scallopRadius, 0);
 
   for (let i = 0; i < scallopCenters.length; i += 1) {
-    const centerX = scallopCenters[i];
-    silhouette.absarc(centerX, 0, scallopRadius, 0, Math.PI, true);
-
-    if (i < scallopCenters.length - 1) {
-      silhouette.lineTo(scallopCenters[i + 1] + scallopRadius, 0);
-    }
+    silhouette.absarc(scallopCenters[i], 0, scallopRadius, 0, Math.PI, true);
+    if (i < scallopCenters.length - 1) silhouette.lineTo(scallopCenters[i + 1] + scallopRadius, 0);
   }
-
   silhouette.lineTo(-halfWidth, 0);
 
-  const ghostGeometry = new THREE.ExtrudeGeometry(silhouette, {
-    depth: bodyDepth,
-    bevelEnabled: true,
-    bevelThickness: size * 0.02,
-    bevelSize: size * 0.016,
-    bevelSegments: 2,
-    curveSegments: 28,
-  });
+  const ghostGeometry = new THREE.ExtrudeGeometry(silhouette, { depth: bodyDepth, bevelEnabled: true, bevelThickness: size * 0.02, bevelSize: size * 0.016, bevelSegments: 2, curveSegments: 28 });
   ghostGeometry.translate(0, 0, -bodyDepth / 2);
 
   const shell = new THREE.Mesh(ghostGeometry, ghostMaterial);
   shell.position.y = scallopRadius;
 
-  const eyeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x020617,
-    roughness: 0.35,
-    metalness: 0,
-  });
+  const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x020617, roughness: 0.35, metalness: 0 });
   const eyeGeometry = new THREE.SphereGeometry(bodyWidth * 0.085, 16, 12);
 
   const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -349,24 +260,17 @@ function createGhostModel(color, size) {
   rightEye.scale.set(0.9, 1.45, 0.75);
   rightEye.position.set(bodyWidth * 0.22, totalHeight * 0.76 + scallopRadius, bodyDepth / 2 + 0.01);
 
-  // --- NOVO: LUZ POR BAIXO DO FANTASMA ---
-  // Cria uma luz da mesma cor do fantasma. 
-  // O número 10 é a intensidade, e o 5 é a distância até onde a luz chega (podes ajustar ao teu gosto).
   const floorLight = new THREE.PointLight(color, 10, 5); 
-  floorLight.position.set(0, 0.5, 0); // Colocada numa posição baixa, perto do chão
+  floorLight.position.set(0, 0.5, 0);
   ghostLights.push(floorLight);
   
   ghost.add(shell, leftEye, rightEye, floorLight);
-
   return ghost;
 }
 
-const entityBaseY = 0.5;
-
 const pacman = createPacmanModel(tileSize);
-const pacmanCell = { row: 12, col: 12 };
-const pacmanWorld = gridToWorld(pacmanCell.row, pacmanCell.col);
-pacman.position.set(pacmanWorld.x, entityBaseY, pacmanWorld.z);
+const pacmanWorld = gridToWorld(12, 12);
+pacman.position.set(pacmanWorld.x, 0.5, pacmanWorld.z);
 scene.add(pacman);
 
 const ghostCells = [
@@ -376,88 +280,112 @@ const ghostCells = [
   { row: 10, col: 13, color: 0xe879f9 },
 ];
 
-for (const ghostConfig of ghostCells) {
-  const ghost = createGhostModel(ghostConfig.color, tileSize);
-  const ghostWorld = gridToWorld(ghostConfig.row, ghostConfig.col);
-  ghost.position.set(ghostWorld.x, entityBaseY, ghostWorld.z);
+// --- NOVO: ARRAY DE DADOS DOS FANTASMAS ---
+const ghostsData = [];
+const ghostBaseSpeed = 4.5;
+
+for (const gc of ghostCells) {
+  const ghost = createGhostModel(gc.color, tileSize);
+  const gw = gridToWorld(gc.row, gc.col);
+  ghost.position.set(gw.x, 0.5, gw.z);
   scene.add(ghost);
+  
+  // Guardar os dados de cada fantasma para a IA
+  ghostsData.push({
+      mesh: ghost,
+      baseColor: gc.color,
+      moveDir: new THREE.Vector3(Math.random() > 0.5 ? 1 : -1, 0, 0),
+      speed: ghostBaseSpeed,
+      isFrightened: false,
+      frightenedTimer: 0
+  });
 }
 
+// Resize
 window.addEventListener("resize", () => {
   updateCamera2DFraming();
-
   camera3D.aspect = window.innerWidth / window.innerHeight;
   camera3D.updateProjectionMatrix();
-
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' || event.key === 'Enter') {
-    if (document.getElementById('mainMenu').classList.contains('hidden')) {
-      returnToMainMenu();
-    }
-    return;
-  }
+// Movimento
+const pacmanSpeed = 5.0;
+const moveDir = new THREE.Vector3(0, 0, 0);
+const nextDir = new THREE.Vector3(0, 0, 0);
 
-    if (event.key === 'v' || event.key === 'V') {
+window.addEventListener('keydown', (event) => {
+    const mainMenu = document.getElementById('mainMenu');
+    
+    // Controlos do Menu e Atalhos
+    if (event.key === 'Escape' || event.key === 'Enter') {
+        if (!mainMenu.classList.contains('hidden') && event.key === 'Enter') {
+            mainMenu.classList.add('hidden');
+            document.getElementById('backToMenuButton').classList.remove('hidden');
+        } else if (mainMenu.classList.contains('hidden') && event.key === 'Escape') {
+            returnToMainMenu();
+        }
+        return;
+    }
+
+    // Se o menu estiver visível, não processa movimentos nem câmara
+    if (!mainMenu.classList.contains('hidden')) return;
+
+    // Alternar Câmara (V)
+    if (event.key.toLowerCase() === 'v') {
         is3DView = !is3DView;
         cameraAtiva = is3DView ? camera3D : camera2D;
-
+        
         if (is3DView) {
-            controls.enabled = true;
-            
-            // 1. Reset da posição da câmara para não ficar "colada" ao chão no início
-            camera3D.position.set(pacman.position.x, pacman.position.y + 8, pacman.position.z + 12);
-            
-            // 2. Apontar o centro de rotação para o Pacman
-            controls.target.copy(pacman.position);
-            
-            // 3. Forçar o OrbitControls a registar a nova posição
-            controls.update();
+            // Posiciona a câmara imediatamente atrás para não iniciar dentro do chão
+            const offset = new THREE.Vector3(0, 12, -16).applyAxisAngle(new THREE.Vector3(0, 1, 0), pacman.rotation.y);
+            camera3D.position.copy(pacman.position).add(offset);
+            camera3D.lookAt(pacman.position.x, pacman.position.y, pacman.position.z);
+            controls.enabled = isFreeLook;
         } else {
             controls.enabled = false;
         }
+        return;
     }
-});
 
-// --- VARIÁVEIS DE MOVIMENTO ---
-const pacmanSpeed = 5.0; // Velocidade do Pac-Man
-const moveDir = new THREE.Vector3(0, 0, 0); // Direção atual
-const nextDir = new THREE.Vector3(0, 0, 0); // Próxima direção que o jogador carregou
+    // Toggle Câmara Livre (L)
+    if (event.key.toLowerCase() === 'l' && is3DView) {
+        isFreeLook = !isFreeLook;
+        const toggleFreeLook = document.getElementById('toggle-freelook');
+        if (toggleFreeLook) toggleFreeLook.checked = isFreeLook;
+        controls.enabled = isFreeLook;
+        return;
+    }
 
-// --- CONTROLOS DO TECLADO ---
-window.addEventListener('keydown', (event) => {
-    // Se o menu estiver visível, não deixa o Pac-Man mover-se
-    if (!document.getElementById('mainMenu').classList.contains('hidden')) return;
+    // Lógica de Movimento
+    let forward, back, left, right;
+    if (is3DView) {
+        let angle = Math.round(pacman.rotation.y / (Math.PI/2)) * (Math.PI/2);
+        let fx = Math.round(Math.sin(angle));
+        let fz = Math.round(Math.cos(angle));
 
-    // Convertemos a tecla para minúscula para aceitar o CAPS LOCK ligado sem problemas
+        forward = new THREE.Vector3(fx, 0, fz);
+        back = new THREE.Vector3(-fx, 0, -fz);
+        left = new THREE.Vector3(fz, 0, -fx);
+        right = new THREE.Vector3(-fz, 0, fx);
+    } else {
+        forward = new THREE.Vector3(0, 0, -1);
+        back = new THREE.Vector3(0, 0, 1);
+        left = new THREE.Vector3(-1, 0, 0);
+        right = new THREE.Vector3(1, 0, 0);
+    }
+
     switch(event.key.toLowerCase()) {
-        case 'w':
-        case 'arrowup':    
-            nextDir.set(0, 0, -1); 
-            break;
-        case 's':
-        case 'arrowdown':  
-            nextDir.set(0, 0, 1); 
-            break;
-        case 'a':
-        case 'arrowleft':  
-            nextDir.set(-1, 0, 0); 
-            break;
-        case 'd':
-        case 'arrowright': 
-            nextDir.set(1, 0, 0); 
-            break;
+        case 'w': case 'arrowup':    nextDir.copy(forward); break;
+        case 's': case 'arrowdown':  nextDir.copy(back); break;
+        case 'a': case 'arrowleft':  nextDir.copy(left); break;
+        case 'd': case 'arrowright': nextDir.copy(right); break;
     }
 });
 
-// --- SISTEMA DE COLISÃO ---
 function checkCollision(newX, newZ) {
-    const radius = tileSize * 0.35; // Um raio ligeiramente menor que o Pac-Man para não prender nas esquinas
-    
-    // Verificamos 5 pontos (centro e os 4 cantos da "caixa" de colisão do Pac-Man)
+    const radius = tileSize * 0.35; 
     const points = [
         { x: newX, z: newZ },
         { x: newX + radius, z: newZ },
@@ -467,52 +395,67 @@ function checkCollision(newX, newZ) {
     ];
 
     for (let p of points) {
-        // Converte a coordenada do mundo 3D para a grelha (matriz) do labirinto
         const col = Math.floor((p.x - xOffset + tileSize / 2) / tileSize);
         const row = Math.floor((p.z - zOffset + tileSize / 2) / tileSize);
 
-        // 1. Saiu dos limites do mapa?
         if (row < 0 || row >= mazeLayout.length || col < 0 || col >= mazeLayout[0].length) return true;
-        
-        // 2. É uma Parede ("1")?
         if (mazeLayout[row][col] === "1") return true;
-        
-        // 3. É a casa dos Fantasmas ou a porta? (Linhas 8 a 10, Colunas 10 a 14)
         if (row >= 8 && row <= 10 && col >= 10 && col <= 14) return true;
     }
-    
-    return false; // Caminho livre!
+    return false;
+}
+// --- NOVO: COLISÃO DOS FANTASMAS ---
+function checkGhostCollision(newX, newZ) {
+    const radius = tileSize * 0.35; 
+    const points = [
+        { x: newX, z: newZ }, { x: newX + radius, z: newZ }, { x: newX - radius, z: newZ },
+        { x: newX, z: newZ + radius }, { x: newX, z: newZ - radius }
+    ];
+    for (let p of points) {
+        const col = Math.floor((p.x - xOffset + tileSize / 2) / tileSize);
+        const row = Math.floor((p.z - zOffset + tileSize / 2) / tileSize);
+        if (row < 0 || row >= mazeLayout.length || col < 0 || col >= mazeLayout[0].length) return true;
+        // Fantasmas só colidem com as paredes ("1"), podem passar na porta!
+        if (mazeLayout[row][col] === "1") return true; 
+    }
+    return false;
 }
 
-const clock = new THREE.Clock();
 
-let lastTime = 0; // Para calcularmos o tempo que passou entre frames (deltaTime)
+const clock = new THREE.Clock();
+let lastTime = 0;
 
 function animate() {
   requestAnimationFrame(animate); 
 
   const t = clock.getElapsedTime();
-  const dt = t - lastTime; // Diferença de tempo exata
+  const dt = Math.min(t - lastTime, 0.1);
   lastTime = t;
 
   directionalLight.position.x = 10 * Math.cos(t * 0.3);
   directionalLight.position.z = 10 * Math.sin(t * 0.3);
 
-  // --- LÓGICA DO PAC-MAN (Só corre se o menu estiver escondido) ---
-  if (document.getElementById('mainMenu').classList.contains('hidden')) {
+  // SÓ PROCESSA O MOVIMENTO SE O JOGO ESTIVER ATIVO
+  const mainMenu = document.getElementById('mainMenu');
+  if (mainMenu && mainMenu.classList.contains('hidden')) {
       
-      // 1. Tentar virar para a nova direção (facilita curvar nas esquinas)
       if (nextDir.lengthSq() > 0) {
           const targetX = pacman.position.x + nextDir.x * pacmanSpeed * dt;
           const targetZ = pacman.position.z + nextDir.z * pacmanSpeed * dt;
           
           if (!checkCollision(targetX, targetZ)) {
-              moveDir.copy(nextDir); // Assume a nova direção
-              nextDir.set(0,0,0);    // Limpa o input
+              if (nextDir.x !== 0) {
+                  const row = Math.round((pacman.position.z - zOffset) / tileSize);
+                  pacman.position.z = zOffset + row * tileSize;
+              } else if (nextDir.z !== 0) {
+                  const col = Math.round((pacman.position.x - xOffset) / tileSize);
+                  pacman.position.x = xOffset + col * tileSize;
+              }
+              moveDir.copy(nextDir);
+              nextDir.set(0,0,0);
           }
       }
 
-      // 2. Mover na direção atual
       let isMoving = false;
       if (moveDir.lengthSq() > 0) {
           const targetX = pacman.position.x + moveDir.x * pacmanSpeed * dt;
@@ -523,130 +466,232 @@ function animate() {
               pacman.position.z = targetZ;
               isMoving = true;
 
-              // Rodar o corpo do Pac-Man para apontar para onde anda
+              if (moveDir.x !== 0) {
+                  const row = Math.round((pacman.position.z - zOffset) / tileSize);
+                  pacman.position.z = THREE.MathUtils.lerp(pacman.position.z, zOffset + row * tileSize, 0.3);
+              } else if (moveDir.z !== 0) {
+                  const col = Math.round((pacman.position.x - xOffset) / tileSize);
+                  pacman.position.x = THREE.MathUtils.lerp(pacman.position.x, xOffset + col * tileSize, 0.3);
+              }
+
               const targetAngle = Math.atan2(moveDir.x, moveDir.z);
               pacman.rotation.y = targetAngle; 
+          } else {
+              moveDir.set(0,0,0); 
           }
       }
 
-      // 3. Animação da Boca
-      if (isMoving) {
-          // Oscila usando uma onda seno (abre e fecha rapidamente baseada no tempo)
+      if (isMoving && pacman.userData.upperHemisphere) {
           const angle = (Math.sin(t * 15) + 1) * 0.25; 
           pacman.userData.upperHemisphere.rotation.x = -angle;
           pacman.userData.lowerHemisphere.rotation.x = angle;
+      }
+
+      for (let i = pelletsGroup.children.length - 1; i >= 0; i--) {
+          const pellet = pelletsGroup.children[i];
+          if (pellet.position.distanceTo(pacman.position) < 0.8) {
+              pelletsGroup.remove(pellet);
+          }
+      }
+
+      // --- NOVO: COMER POWER PELLETS E CEREJA ---
+      for (let i = powerPelletsGroup.children.length - 1; i >= 0; i--) {
+          const pp = powerPelletsGroup.children[i];
+          if (pp.position.distanceTo(pacman.position) < 1.0) {
+              powerPelletsGroup.remove(pp);
+              // Fantasmas ficam com medo!
+              ghostsData.forEach(ghost => {
+                  ghost.isFrightened = true;
+                  ghost.frightenedTimer = 8.0; // 8 segundos de poder
+                  ghost.speed = ghostBaseSpeed * 0.5; // Ficam mais lentos
+                  ghost.mesh.children[0].material.color.setHex(0x1e3a8a); // Ficam azuis
+                  ghost.mesh.children[0].material.emissive.setHex(0x3b82f6);
+              });
+          }
+      }
+
+      if (cherryGroup.visible && cherryGroup.position.distanceTo(pacman.position) < 1.0) {
+          cherryGroup.visible = false; // Come a cereja
+      }
+
+    // --- NOVO: MOVIMENTO E IA DOS FANTASMAS ---
+      ghostsData.forEach(ghost => {
+          // 1. Lidar com o medo (Piscar e perder a cor)
+          if (ghost.isFrightened) {
+              ghost.frightenedTimer -= dt;
+              
+              if (ghost.frightenedTimer < 2.0 && Math.floor(t * 10) % 2 === 0) {
+                  ghost.mesh.children[0].material.color.setHex(0xffffff);
+              } else {
+                  ghost.mesh.children[0].material.color.setHex(0x1e3a8a);
+              }
+
+              if (ghost.frightenedTimer <= 0) {
+                  ghost.isFrightened = false;
+                  ghost.speed = ghostBaseSpeed;
+                  ghost.mesh.children[0].material.color.setHex(ghost.baseColor);
+                  ghost.mesh.children[0].material.emissive.setHex(ghost.baseColor);
+              }
+          }
+
+          // 2. LÓGICA PARA SAIR DA CASA DOS FANTASMAS
+          const currentRow = Math.round((ghost.mesh.position.z - zOffset) / tileSize);
+          const currentCol = Math.round((ghost.mesh.position.x - xOffset) / tileSize);
+          const isGhostHouse = (currentRow === 9 || currentRow === 10) && (currentCol >= 10 && currentCol <= 14);
+
+          // Se estiverem na casa, forçamos um caminho guiado para a porta!
+          if (isGhostHouse) {
+              // Se já chegaram (ou estão muito perto) da coluna da porta (12), sobem!
+              if (Math.abs(ghost.mesh.position.x - (xOffset + 12 * tileSize)) < 0.2) {
+                  ghost.mesh.position.x = xOffset + 12 * tileSize; // Alinha-o perfeitamente
+                  ghost.moveDir.set(0, 0, -1); // Vai para CIMA
+              } 
+              // Se estão à esquerda da porta, vão para a DIREITA
+              else if (ghost.mesh.position.x < xOffset + 12 * tileSize) {
+                  ghost.moveDir.set(1, 0, 0);
+              } 
+              // Se estão à direita da porta, vão para a ESQUERDA
+              else {
+                  ghost.moveDir.set(-1, 0, 0);
+              }
+          }
+
+          // 3. Movimento Normal do Fantasma pelo Labirinto
+          let ghostTargetX = ghost.mesh.position.x + ghost.moveDir.x * ghost.speed * dt;
+          let ghostTargetZ = ghost.mesh.position.z + ghost.moveDir.z * ghost.speed * dt;
+
+          // Só verificamos se ele deve virar caso NÃO esteja na casa
+          if (checkGhostCollision(ghostTargetX, ghostTargetZ) && !isGhostHouse) {
+              ghost.mesh.position.x = xOffset + currentCol * tileSize;
+              ghost.mesh.position.z = zOffset + currentRow * tileSize;
+
+              const dirs = [
+                  new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
+                  new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)
+              ];
+              
+              const validDirs = dirs.filter(d => !checkGhostCollision(ghost.mesh.position.x + d.x * tileSize * 0.5, ghost.mesh.position.z + d.z * tileSize * 0.5));
+              
+              const backDir = ghost.moveDir.clone().negate();
+              let possibleDirs = validDirs.filter(d => !d.equals(backDir));
+              if (possibleDirs.length === 0) possibleDirs = validDirs; 
+              
+              if (possibleDirs.length > 0) {
+                  ghost.moveDir = possibleDirs[Math.floor(Math.random() * possibleDirs.length)];
+              }
+          } else {
+              ghost.mesh.position.x = ghostTargetX;
+              ghost.mesh.position.z = ghostTargetZ;
+
+              // Mantém-nos alinhados com o corredor (desativado dentro de casa para não interferir com a saída)
+              if (ghost.moveDir.x !== 0 && !isGhostHouse) {
+                  ghost.mesh.position.z = THREE.MathUtils.lerp(ghost.mesh.position.z, zOffset + currentRow * tileSize, 0.3);
+              } else if (ghost.moveDir.z !== 0 && !isGhostHouse) {
+                  ghost.mesh.position.x = THREE.MathUtils.lerp(ghost.mesh.position.x, xOffset + currentCol * tileSize, 0.3);
+              }
+          }
+
+          // --- CORREÇÃO DE ROTAÇÃO: Faz os olhos olharem para onde estão a andar ---
+          if (ghost.moveDir.lengthSq() > 0) {
+              ghost.mesh.rotation.y = Math.atan2(ghost.moveDir.x, ghost.moveDir.z);
+          }
+
+          // 4. Colisão com o Pac-Man
+          if (ghost.mesh.position.distanceTo(pacman.position) < 1.3) {
+              if (ghost.isFrightened) {
+                  ghost.isFrightened = false;
+                  ghost.speed = ghostBaseSpeed;
+                  ghost.mesh.children[0].material.color.setHex(ghost.baseColor);
+                  ghost.mesh.children[0].material.emissive.setHex(ghost.baseColor);
+                  
+                  // Manda de volta para o meio da casa
+                  const basePos = gridToWorld(9, 12);
+                  ghost.mesh.position.set(basePos.x, 0.5, basePos.z);
+                  ghost.moveDir.set(0, 0, -1); // Força-o a sair novamente
+              } else {
+                  returnToMainMenu();
+                  const startPos = gridToWorld(12, 12);
+                  pacman.position.set(startPos.x, 0.5, startPos.z);
+                  nextDir.set(0,0,0); moveDir.set(0,0,0);
+              }
+          }
+      });
+  }
+
+  // CÂMARA 3D
+  if (is3DView) {
+      if (isFreeLook && controls) {
+          controls.enabled = true;
+          controls.target.copy(pacman.position);
+          controls.update();
       } else {
-          // Se estiver parado contra uma parede, a boca fica meio aberta
-          pacman.userData.upperHemisphere.rotation.x = -0.2;
-          pacman.userData.lowerHemisphere.rotation.x = 0.2;
+          if (controls) controls.enabled = false;
+          const cameraOffset = new THREE.Vector3(0, 12, -16); 
+          cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), pacman.rotation.y);
+          
+          const targetPos = pacman.position.clone().add(cameraOffset);
+          camera3D.position.lerp(targetPos, 0.1);
+          camera3D.lookAt(pacman.position.x, pacman.position.y, pacman.position.z);
       }
   }
 
-  // --- LÓGICA DA CÂMARA 3D ---
-  if (is3DView) {
-    controls.target.lerp(pacman.position, 0.1); 
-    controls.target.y += 0.5; 
-    controls.update();
-  }
-
-  renderer.render(scene, cameraAtiva);
+  renderer.render(scene, cameraAtiva); 
 }
 
 animate();
 
-// --- LÓGICA DO MENU PRINCIPAL ---
-const mainMenu = document.getElementById('mainMenu');
+// --- LÓGICA DO MENU E DEFINIÇÕES ---
 const playButton = document.getElementById('playButton');
 const charactersMenuButton = document.getElementById('charactersMenuButton');
-// Elemento do novo botão
 const backToMenuButton = document.getElementById('backToMenuButton');
+
+const instructionsButton = document.getElementById('instructionsButton');
+const instructionsModal = document.getElementById('instructionsModal');
+const closeInstructionsButton = document.getElementById('closeInstructionsButton');
+const exitButton = document.getElementById('exitButton');
+
 const settingsButton = document.getElementById('settingsButton');
 const settingsModal = document.getElementById('settingsModal');
 const closeSettingsButton = document.getElementById('closeSettingsButton');
+
 const toggleAmbient = document.getElementById('toggle-ambient');
 const toggleDirectional = document.getElementById('toggle-directional');
 const togglePoint = document.getElementById('toggle-point');
+const toggleFreeLook = document.getElementById('toggle-freelook');
 
 function returnToMainMenu() {
-  mainMenu.classList.remove('hidden');
-  backToMenuButton.classList.add('hidden');
-  is3DView = false;
-  cameraAtiva = camera2D;
-  controls.enabled = false;
+    const mainMenu = document.getElementById('mainMenu');
+    if (mainMenu) mainMenu.classList.remove('hidden');
+    if (backToMenuButton) backToMenuButton.classList.add('hidden');
+    is3DView = false;
+    cameraAtiva = camera2D;
+    if (controls) controls.enabled = false;
 }
 
-// Quando se clica em "Jogar"
-playButton.addEventListener('click', () => {
-    mainMenu.classList.add('hidden'); // Esconde o menu
-    backToMenuButton.classList.remove('hidden'); // Mostra o botão "Voltar ao Menu"
-});
+if (playButton) playButton.onclick = () => {
+    const mainMenu = document.getElementById('mainMenu');
+    if (mainMenu) mainMenu.classList.add('hidden');
+    if (backToMenuButton) backToMenuButton.classList.remove('hidden');
+};
+if (backToMenuButton) backToMenuButton.onclick = returnToMainMenu;
+if (charactersMenuButton) charactersMenuButton.onclick = () => window.location.href = './characters.html';
+if (exitButton) exitButton.onclick = () => { if(confirm("Tens a certeza que queres sair do jogo?")) window.location.href = "about:blank"; };
 
-// Quando se clica em "Voltar ao Menu" (dentro do jogo)
-backToMenuButton.addEventListener('click', () => {
-  returnToMainMenu();
-});
+if (instructionsButton) instructionsButton.onclick = () => instructionsModal.classList.remove('hidden');
+if (closeInstructionsButton) closeInstructionsButton.onclick = () => instructionsModal.classList.add('hidden');
 
-// Quando o jogador clica em "Jogar", escondemos o menu
-playButton.addEventListener('click', () => {
-    mainMenu.classList.add('hidden');
-});
+if (settingsButton) settingsButton.onclick = () => settingsModal.classList.remove('hidden');
+if (closeSettingsButton) closeSettingsButton.onclick = () => settingsModal.classList.add('hidden');
 
-// Quando o jogador clica em "Personagens", vai para a página respetiva
-charactersMenuButton.addEventListener('click', () => {
-    window.location.href = './characters.html';
-});
-
-// --- LÓGICA DOS NOVOS BOTÕES ---
-const instructionsButton = document.getElementById('instructionsButton');
-const exitButton = document.getElementById('exitButton');
-
-// Elementos do Modal (a nova janela)
-const instructionsModal = document.getElementById('instructionsModal');
-const closeInstructionsButton = document.getElementById('closeInstructionsButton');
-
-// Quando se clica em "Instruções", tira a classe 'hidden' para mostrar a janela
-instructionsButton.addEventListener('click', () => {
-    instructionsModal.classList.remove('hidden');
-});
-
-// Quando se clica em "Fechar", volta a adicionar a classe 'hidden' para a esconder
-closeInstructionsButton.addEventListener('click', () => {
-    instructionsModal.classList.add('hidden');
-});
-
-// Lógica do botão Sair (esta mantém-se igual)
-exitButton.addEventListener('click', () => {
-    if (confirm("Tens a certeza que queres sair do jogo?")) {
-        window.location.href = "about:blank"; 
-    }
-});
-
-settingsButton.addEventListener('click', () => {
-    settingsModal.classList.remove('hidden');
-});
-
-closeSettingsButton.addEventListener('click', () => {
-    settingsModal.classList.add('hidden');
-});
-
-toggleAmbient.addEventListener('change', (event) => {
-    if (typeof ambientLight !== 'undefined') {
-        ambientLight.visible = event.target.checked;
-    }
-});
-
-toggleDirectional.addEventListener('change', (event) => {
-    if (typeof directionalLight !== 'undefined') {
-        directionalLight.visible = event.target.checked;
-    }
-});
-
-togglePoint.addEventListener('change', (event) => {
-  ghostLights.forEach((light) => {
-    light.visible = event.target.checked;
-  });
-});
-
-ghostLights.forEach((light) => {
-  light.visible = togglePoint.checked;
-});
+if (toggleAmbient) toggleAmbient.onchange = (e) => { if (ambientLight) ambientLight.visible = e.target.checked; };
+if (toggleDirectional) toggleDirectional.onchange = (e) => { if (directionalLight) directionalLight.visible = e.target.checked; };
+if (togglePoint) {
+    togglePoint.onchange = (e) => ghostLights.forEach(l => l.visible = e.target.checked);
+    ghostLights.forEach(l => l.visible = togglePoint.checked); // Sincroniza o arranque
+}
+if (toggleFreeLook) {
+    toggleFreeLook.onchange = (e) => {
+        isFreeLook = e.target.checked;
+        if (is3DView && controls) controls.enabled = isFreeLook;
+    };
+}
