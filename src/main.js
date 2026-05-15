@@ -128,20 +128,61 @@ const powerPelletsGroup = new THREE.Group();
 const powerPelletGeo = new THREE.SphereGeometry(0.5, 16, 16);
 const powerPelletMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
 
+// Função genérica para gerar posições válidas (cerejas, laranjas, etc)
+function generateValidPositions(count = 3, excludePositions = []) {
+  const validPositions = [];
+  const selectedPositions = [];
+  
+  // Recolher todas as posições válidas
+  for (let row = 0; row < mazeLayout.length; row += 1) {
+    for (let col = 0; col < mazeLayout[row].length; col += 1) {
+      const isWall = mazeLayout[row][col] === "1";
+      const isGhostHouse = (row === 9 || row === 10) && (col >= 10 && col <= 14);
+      const isGhostDoor = (row === 8 && col === 12);
+      const isPowerPellet = (row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23);
+      const isPacmanStart = (row === 12 && col === 12);
+      const isExcluded = excludePositions.some(pos => pos.row === row && pos.col === col);
+      
+      if (!isWall && !isGhostHouse && !isGhostDoor && !isPowerPellet && !isPacmanStart && !isExcluded) {
+        validPositions.push({ row, col });
+      }
+    }
+  }
+  
+  // Selecionar 'count' posições aleatórias
+  for (let i = 0; i < count && validPositions.length > 0; i++) {
+    const randomIdx = Math.floor(Math.random() * validPositions.length);
+    const selectedPos = validPositions[randomIdx];
+    selectedPositions.push(selectedPos);
+    validPositions.splice(randomIdx, 1);
+  }
+  
+  return selectedPositions;
+}
+
+const cherryPositions = generateValidPositions(3);
+const orangePositions = generateValidPositions(2, cherryPositions);
+const bananaPositions = generateValidPositions(1, cherryPositions.concat(orangePositions));
+
 for (let row = 0; row < mazeLayout.length; row += 1) {
   for (let col = 0; col < mazeLayout[row].length; col += 1) {
     const isGhostHouse = (row === 9 || row === 10) && (col >= 10 && col <= 14);
     const isGhostDoor = (row === 8 && col === 12);
+    const isCherryTile = cherryPositions.some(pos => pos.row === row && pos.col === col);
+    const isOrangeTile = orangePositions.some(pos => pos.row === row && pos.col === col);
+    const isBananaTile = bananaPositions.some(pos => pos.row === row && pos.col === col);
 
-    if (mazeLayout[row][col] === "0" && !isGhostHouse && !isGhostDoor) {
+    if (mazeLayout[row][col] === "0" && !isGhostHouse && !isGhostDoor && !isCherryTile && !isOrangeTile && !isBananaTile) {
       const worldPos = gridToWorld(row, col);
       // Os 4 cantos do labirinto recebem Power Pellets
       if ((row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23)) {
           const pp = new THREE.Mesh(powerPelletGeo, powerPelletMat);
+          pp.userData.collectibleType = 'power';
           pp.position.set(worldPos.x, 0.6, worldPos.z);
           powerPelletsGroup.add(pp);
       } else {
           const pellet = new THREE.Mesh(pelletGeometry, pelletMaterial);
+          pellet.userData.collectibleType = 'normal';
           pellet.position.set(worldPos.x, 0.6, worldPos.z);
           pelletsGroup.add(pellet);
       }
@@ -151,16 +192,190 @@ for (let row = 0; row < mazeLayout.length; row += 1) {
 scene.add(pelletsGroup);
 scene.add(powerPelletsGroup);
 
-// --- NOVO: CEREJA ---
-const cherryGroup = new THREE.Group();
-const cherryGeo = new THREE.SphereGeometry(0.3, 16, 16);
-const cherryMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
-const c1 = new THREE.Mesh(cherryGeo, cherryMat); c1.position.set(-0.25, 0.3, 0);
-const c2 = new THREE.Mesh(cherryGeo, cherryMat); c2.position.set(0.25, 0.3, 0);
-cherryGroup.add(c1, c2);
-const cherryWorld = gridToWorld(13, 12); 
-cherryGroup.position.set(cherryWorld.x, 0.5, cherryWorld.z);
-scene.add(cherryGroup);
+// --- NOVO: CEREJA 3D ---
+function createCherryModel() {
+  const cherry = new THREE.Group();
+  
+  // Fruto esquerdo (esfera vermelha)
+  const fruitGeo = new THREE.SphereGeometry(0.32, 24, 24);
+  const fruitMat = new THREE.MeshStandardMaterial({ 
+    color: 0xdc2626, 
+    roughness: 0.3, 
+    metalness: 0.15,
+    emissive: 0xb91c1c,
+    emissiveIntensity: 0.2
+  });
+  const fruitLeft = new THREE.Mesh(fruitGeo, fruitMat);
+  fruitLeft.position.set(-0.35, 0, 0);
+  cherry.add(fruitLeft);
+  
+  // Fruto direito (esfera vermelha)
+  const fruitRight = new THREE.Mesh(fruitGeo, fruitMat);
+  fruitRight.position.set(0.35, 0, 0);
+  cherry.add(fruitRight);
+  
+  // Talo esquerdo (curvo, converge para o centro)
+  const stalk1Points = [
+    new THREE.Vector3(-0.35, 0.35, 0),
+    new THREE.Vector3(-0.35, 0.55, 0.05),
+    new THREE.Vector3(-0.1, 0.78, 0.1)
+  ];
+  const stalk1Curve = new THREE.CatmullRomCurve3(stalk1Points);
+  const stalk1Geo = new THREE.TubeGeometry(stalk1Curve, 8, 0.04, 4, false);
+  const stalkMat = new THREE.MeshStandardMaterial({ 
+    color: 0x7c3a2b,
+    roughness: 0.7,
+    metalness: 0.02
+  });
+  const stalk1 = new THREE.Mesh(stalk1Geo, stalkMat);
+  cherry.add(stalk1);
+  
+  // Talo direito (curvo, converge para o centro)
+  const stalk2Points = [
+    new THREE.Vector3(0.35, 0.35, 0),
+    new THREE.Vector3(0.35, 0.55, 0.05),
+    new THREE.Vector3(0.1, 0.78, 0.1)
+  ];
+  const stalk2Curve = new THREE.CatmullRomCurve3(stalk2Points);
+  const stalk2Geo = new THREE.TubeGeometry(stalk2Curve, 8, 0.04, 4, false);
+  const stalk2 = new THREE.Mesh(stalk2Geo, stalkMat);
+  cherry.add(stalk2);
+  
+  // Folha (verde e alongada, conectada aos talos)
+  const leafShape = new THREE.Shape();
+  leafShape.moveTo(-0.3, 0);
+  leafShape.bezierCurveTo(-0.3, -0.15, 0, -0.25, 0.3, 0);
+  leafShape.bezierCurveTo(0, 0.15, -0.3, 0.15, -0.3, 0);
+  
+  const leafGeo = new THREE.ShapeGeometry(leafShape);
+  const leafMat = new THREE.MeshStandardMaterial({ 
+    color: 0x22c55e,
+    roughness: 0.5,
+    metalness: 0.02,
+    side: THREE.DoubleSide
+  });
+  const leaf = new THREE.Mesh(leafGeo, leafMat);
+  leaf.position.set(0, 0.85, 0.08);
+  leaf.rotation.x = Math.PI / 3.5;
+  leaf.rotation.z = Math.PI / 12;
+  cherry.add(leaf);
+  
+  return cherry;
+}
+
+// --- NOVO: LARANJA 3D ---
+function createOrangeModel() {
+  const orange = new THREE.Group();
+  
+  // Corpo principal (esfera laranja grande)
+  const fruitGeo = new THREE.SphereGeometry(0.4, 28, 28);
+  const fruitMat = new THREE.MeshStandardMaterial({ 
+    color: 0xff9500, 
+    roughness: 0.5, 
+    metalness: 0.1,
+    emissive: 0xff6b00,
+    emissiveIntensity: 0.1
+  });
+  const fruit = new THREE.Mesh(fruitGeo, fruitMat);
+  orange.add(fruit);
+  
+  // Talo (pequeno cilindro castanho)
+  const stemGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.25, 8);
+  const stemMat = new THREE.MeshStandardMaterial({ 
+    color: 0x7c5c3d,
+    roughness: 0.7,
+    metalness: 0.02
+  });
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.y = 0.45;
+  orange.add(stem);
+  
+  // Folha verde (alongada)
+  const leafShape = new THREE.Shape();
+  leafShape.moveTo(-0.25, 0);
+  leafShape.bezierCurveTo(-0.25, -0.12, 0, -0.18, 0.25, 0);
+  leafShape.bezierCurveTo(0, 0.1, -0.25, 0.1, -0.25, 0);
+  
+  const leafGeo = new THREE.ShapeGeometry(leafShape);
+  const leafMat = new THREE.MeshStandardMaterial({ 
+    color: 0x22c55e,
+    roughness: 0.5,
+    metalness: 0.02,
+    side: THREE.DoubleSide
+  });
+  const leaf = new THREE.Mesh(leafGeo, leafMat);
+  leaf.position.set(0.18, 0.55, 0.08);
+  leaf.rotation.x = Math.PI / 3;
+  leaf.rotation.z = Math.PI / 6;
+  orange.add(leaf);
+  
+  return orange;
+}
+
+// --- NOVO: BANANA 3D ---
+function createBananaModel() {
+  const banana = new THREE.Group();
+  
+  // Corpo principal (alongado e ligeiramente curvo)
+  const bananaGeo = new THREE.CylinderGeometry(0.15, 0.13, 0.7, 16, 8);
+  const bananaMat = new THREE.MeshStandardMaterial({ 
+    color: 0xffd60a, 
+    roughness: 0.35, 
+    metalness: 0.1,
+    emissive: 0xffa500,
+    emissiveIntensity: 0.1
+  });
+  const bananaBody = new THREE.Mesh(bananaGeo, bananaMat);
+  bananaBody.rotation.z = Math.PI / 4; // Inclinação
+  banana.add(bananaBody);
+  
+  // Ponta castanha (topo da banana)
+  const tipGeo = new THREE.SphereGeometry(0.12, 16, 16);
+  const tipMat = new THREE.MeshStandardMaterial({ 
+    color: 0x6b4423,
+    roughness: 0.6,
+    metalness: 0.02
+  });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.scale.set(1, 0.7, 1);
+  tip.position.set(0.35, 0.45, 0);
+  banana.add(tip);
+  
+  return banana;
+}
+
+// Criar 3 cerejas em posições aleatórias
+const cherriesGroup = new THREE.Group();
+for (let cherryPos of cherryPositions) {
+  const cherryModel = createCherryModel();
+  const cherryWorld = gridToWorld(cherryPos.row, cherryPos.col);
+  cherryModel.position.set(cherryWorld.x, 0.5, cherryWorld.z);
+  cherryModel.userData.collectibleType = 'cherry';
+  cherriesGroup.add(cherryModel);
+}
+powerPelletsGroup.add(cherriesGroup);
+
+// Criar 2 laranjas em posições aleatórias
+const orangesGroup = new THREE.Group();
+for (let orangePos of orangePositions) {
+  const orangeModel = createOrangeModel();
+  const orangeWorld = gridToWorld(orangePos.row, orangePos.col);
+  orangeModel.position.set(orangeWorld.x, 0.5, orangeWorld.z);
+  orangeModel.userData.collectibleType = 'orange';
+  orangesGroup.add(orangeModel);
+}
+powerPelletsGroup.add(orangesGroup);
+
+// Criar 1 banana em posição aleatória
+const bananasGroup = new THREE.Group();
+for (let bananaPos of bananaPositions) {
+  const bananaModel = createBananaModel();
+  const bananaWorld = gridToWorld(bananaPos.row, bananaPos.col);
+  bananaModel.position.set(bananaWorld.x, 0.5, bananaWorld.z);
+  bananaModel.userData.collectibleType = 'banana';
+  bananasGroup.add(bananaModel);
+}
+powerPelletsGroup.add(bananasGroup);
 
 function gridToWorld(row, col) {
   return { x: xOffset + col * tileSize, z: zOffset + row * tileSize };
@@ -499,19 +714,17 @@ function animate() {
           const pp = powerPelletsGroup.children[i];
           if (pp.position.distanceTo(pacman.position) < 1.0) {
               powerPelletsGroup.remove(pp);
-              // Fantasmas ficam com medo!
-              ghostsData.forEach(ghost => {
-                  ghost.isFrightened = true;
-                  ghost.frightenedTimer = 8.0; // 8 segundos de poder
-                  ghost.speed = ghostBaseSpeed * 0.5; // Ficam mais lentos
-                  ghost.mesh.children[0].material.color.setHex(0x1e3a8a); // Ficam azuis
-                  ghost.mesh.children[0].material.emissive.setHex(0x3b82f6);
-              });
+              if ((pp.userData.collectibleType || 'power') === 'power') {
+                  // Fantasmas ficam com medo!
+                  ghostsData.forEach(ghost => {
+                      ghost.isFrightened = true;
+                      ghost.frightenedTimer = 8.0; // 8 segundos de poder
+                      ghost.speed = ghostBaseSpeed * 0.5; // Ficam mais lentos
+                      ghost.mesh.children[0].material.color.setHex(0x1e3a8a); // Ficam azuis
+                      ghost.mesh.children[0].material.emissive.setHex(0x3b82f6);
+                  });
+              }
           }
-      }
-
-      if (cherryGroup.visible && cherryGroup.position.distanceTo(pacman.position) < 1.0) {
-          cherryGroup.visible = false; // Come a cereja
       }
 
     // --- NOVO: MOVIMENTO E IA DOS FANTASMAS ---
