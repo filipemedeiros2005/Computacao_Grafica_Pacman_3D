@@ -158,6 +158,7 @@ renderer.domElement.addEventListener('wheel', (event) => {
 const wallGeometry = new THREE.BoxGeometry(tileSize, wallHeight, tileSize);
 const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.45, metalness: 0.05 });
 const wallsGroup = new THREE.Group();
+let backgroundScene = null;
 
 for (let row = 0; row < mazeLayout.length; row += 1) {
   for (let col = 0; col < mazeLayout[row].length; col += 1) {
@@ -178,6 +179,7 @@ gltfLoader.load(
   `${assetBase}cenario.glb`,
     (gltf) => {
         const cenario = gltf.scene;
+        backgroundScene = cenario;
 
         cenario.position.y = 4.8;
         
@@ -677,8 +679,8 @@ function configureControlsForFreeNavigation() {
     controls.enablePan = true;
     controls.minDistance = 1.5;
     controls.maxDistance = Math.max(mazeWidth, mazeDepth) * 1.2;
-    controls.maxPolarAngle = Math.PI - 0.05;
-    controls.minPolarAngle = 0.05;
+  controls.maxPolarAngle = Math.PI / 2;
+  controls.minPolarAngle = 0;
 }
 
 function resetGameEntities() {
@@ -744,17 +746,24 @@ window.addEventListener('keydown', (event) => {
     const mainMenu = document.getElementById('mainMenu');
     
     // Controlos do Menu e Atalhos
-    if (event.key === 'Escape' || event.key === 'Enter') {
-    if (!mainMenu.classList.contains('hidden') && event.key === 'Enter') {
-      if (hasActiveGameSession) {
-        resumePausedGameplay();
-      } else {
-        startGameplaySession({ resetEntities: true, resetMusic: true });
-      }
-    } else if (mainMenu.classList.contains('hidden') && event.key === 'Escape') {
-            returnToMainMenu();
+    if (event.key === 'Enter') {
+      if (!mainMenu.classList.contains('hidden')) {
+        if (hasActiveGameSession) {
+          resumePausedGameplay();
+        } else {
+          startGameplaySession({ resetEntities: true, resetMusic: true });
         }
-        return;
+      }
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      if (isFreeNavigationMode) {
+        returnToMainMenuFromFreeNavigation();
+      } else if (mainMenu.classList.contains('hidden')) {
+        returnToMainMenu();
+      }
+      return;
     }
 
     // Se o menu estiver visível, não processa movimentos nem câmara
@@ -924,6 +933,7 @@ function animate() {
           const pellet = pelletsGroup.children[i];
           if (pellet.position.distanceTo(pacman.position) < 0.8) {
               pelletsGroup.remove(pellet);
+            addScore(getCollectibleScore(pellet.userData.collectibleType));
               playSFX(chompSound);
           }
       }
@@ -933,6 +943,7 @@ function animate() {
           const pp = powerPelletsGroup.children[i];
           if (pp.position.distanceTo(pacman.position) < 1.0) {
               powerPelletsGroup.remove(pp);
+            addScore(getCollectibleScore(pp.userData.collectibleType));
               playSFX(powerupSound);
               if ((pp.userData.collectibleType || 'power') === 'power') {
                   // Fantasmas ficam com medo!
@@ -1051,19 +1062,34 @@ function animate() {
                   ghost.speed = ghostBaseSpeed;
                   ghost.mesh.children[0].material.color.setHex(ghost.baseColor);
                   ghost.mesh.children[0].material.emissive.setHex(ghost.baseColor);
+                  addScore(100);
                   
                   // Manda de volta para o meio da casa
                   const basePos = gridToWorld(9, 12);
                   ghost.mesh.position.set(basePos.x, 0.5, basePos.z);
                   ghost.moveDir.set(0, 0, -1); // Força-o a sair novamente
               } else {
-                  returnToMainMenu();
-                  const startPos = gridToWorld(12, 12);
-                  pacman.position.set(startPos.x, 0.5, startPos.z);
-                  nextDir.set(0,0,0); moveDir.set(0,0,0);
+                  if (lives > 1) {
+                    setLives(lives - 1);
+                    resetPacmanAfterHit();
+                  } else {
+                    setLives(0);
+                    endGameOver();
+                  }
               }
           }
       });
+
+            if (
+              hasActiveGameSession &&
+              !isGamePaused &&
+              mainMenu &&
+              mainMenu.classList.contains('hidden') &&
+              pelletsGroup.children.length === 0 &&
+              powerPelletsGroup.children.length === 0
+            ) {
+              restartMazeLevel();
+            }
   }
 
   // CÂMARA 3D
@@ -1110,12 +1136,55 @@ const closeSettingsButton = document.getElementById('closeSettingsButton');
 const toggleAmbient = document.getElementById('toggle-ambient');
 const toggleDirectional = document.getElementById('toggle-directional');
 const togglePoint = document.getElementById('toggle-point');
+const toggleBackground = document.getElementById('toggle-background');
 const toggleFreeLook = document.getElementById('toggle-freelook');
 const volumeSlider = document.getElementById('volumeSlider');
 const sfxVolumeSlider = document.getElementById('sfxVolumeSlider');
+const scoreHud = document.getElementById('scoreHud');
+const scoreValue = document.getElementById('scoreValue');
+const livesHud = document.getElementById('livesHud');
+const livesValue = document.getElementById('livesValue');
 
 let hasActiveGameSession = false;
 let isGamePaused = false;
+let score = 0;
+let lives = 3;
+
+function updateScoreHud() {
+  if (scoreValue) {
+    scoreValue.textContent = String(score);
+  }
+}
+
+function updateLivesHud() {
+  if (livesValue) {
+    livesValue.textContent = String(lives);
+  }
+}
+
+function addScore(points) {
+  score += points;
+  updateScoreHud();
+}
+
+function setLives(value) {
+  lives = Math.max(0, value);
+  updateLivesHud();
+}
+
+function getCollectibleScore(collectibleType) {
+  switch (collectibleType) {
+    case 'normal':
+      return 10;
+    case 'cherry':
+    case 'orange':
+      return 20;
+    case 'banana':
+      return 50;
+    default:
+      return 0;
+  }
+}
 
 // --- CONFIGURAÇÃO DAS MÚSICAS (MENU E JOGO) ---
 const menuMusic = new Audio(`${assetBase}audio/menu_theme.mp3`);
@@ -1171,12 +1240,20 @@ function startGameplaySession({ resetEntities = false, resetMusic = true } = {})
     resetGameEntities();
   }
 
+  if (resetEntities) {
+    score = 0;
+    updateScoreHud();
+    setLives(3);
+  }
+
   hasActiveGameSession = true;
   isGamePaused = false;
 
   const mainMenu = document.getElementById('mainMenu');
   if (mainMenu) mainMenu.classList.add('hidden');
   if (backToMenuButton) backToMenuButton.classList.remove('hidden');
+  if (scoreHud) scoreHud.classList.remove('hidden');
+  if (livesHud) livesHud.classList.remove('hidden');
 
   isFreeNavigationMode = false;
   is3DView = false;
@@ -1212,6 +1289,33 @@ function restartGameplaySession() {
   startGameplaySession({ resetEntities: true, resetMusic: true });
 }
 
+function restartMazeLevel() {
+  populateCollectibles();
+}
+
+function resetPacmanAfterHit() {
+  const startPos = gridToWorld(12, 12);
+  pacman.position.set(startPos.x, 0.5, startPos.z);
+  pacman.rotation.y = 0;
+  nextDir.set(0, 0, 0);
+  moveDir.set(0, 0, 0);
+}
+
+function endGameOver() {
+  hasActiveGameSession = false;
+  isGamePaused = false;
+
+  const mainMenu = document.getElementById('mainMenu');
+  if (mainMenu) mainMenu.classList.remove('hidden');
+  if (backToMenuButton) backToMenuButton.classList.add('hidden');
+  if (scoreHud) scoreHud.classList.add('hidden');
+  if (livesHud) livesHud.classList.add('hidden');
+
+  gameMusic.pause();
+  startMenuMusic();
+  syncMainMenuButtons();
+}
+
 function pauseGameplayToMenu() {
   if (!hasActiveGameSession) {
     return;
@@ -1222,9 +1326,34 @@ function pauseGameplayToMenu() {
   const mainMenu = document.getElementById('mainMenu');
   if (mainMenu) mainMenu.classList.remove('hidden');
   if (backToMenuButton) backToMenuButton.classList.add('hidden');
+  if (scoreHud) scoreHud.classList.add('hidden');
+  if (livesHud) livesHud.classList.add('hidden');
 
   gameMusic.pause();
   menuMusic.play().catch(e => console.log(e));
+  syncMainMenuButtons();
+}
+
+function returnToMainMenuFromFreeNavigation() {
+  isFreeNavigationMode = false;
+  isFreeLook = false;
+  is3DView = false;
+  cameraAtiva = camera2D;
+  camera2DZoom.currentZoom = 1;
+  updateCamera2DZoom();
+  configureControlsForGameplayView();
+  if (controls) controls.enabled = false;
+
+  const mainMenu = document.getElementById('mainMenu');
+  if (mainMenu) mainMenu.classList.remove('hidden');
+  if (backToMenuButton) backToMenuButton.classList.add('hidden');
+  if (scoreHud) scoreHud.classList.add('hidden');
+  if (livesHud) livesHud.classList.add('hidden');
+
+  menuMusic.pause();
+  if (hasActiveGameSession && !isGamePaused) {
+    gameMusic.play().catch(e => console.log(e));
+  }
   syncMainMenuButtons();
 }
 
@@ -1269,7 +1398,13 @@ if (freeNavigationButton) freeNavigationButton.onclick = () => {
     enterFreeNavigationMode(); // Entra no modo de exploração em total silêncio
 };
 
-if (backToMenuButton) backToMenuButton.onclick = returnToMainMenu;
+if (backToMenuButton) backToMenuButton.onclick = () => {
+  if (isFreeNavigationMode) {
+    returnToMainMenuFromFreeNavigation();
+  } else {
+    returnToMainMenu();
+  }
+};
 
 syncMainMenuButtons();
 if (charactersMenuButton) charactersMenuButton.onclick = () => window.location.href = './characters.html';
@@ -1286,6 +1421,18 @@ if (toggleDirectional) toggleDirectional.onchange = (e) => { if (directionalLigh
 if (togglePoint) {
     togglePoint.onchange = (e) => ghostLights.forEach(l => l.visible = e.target.checked);
     ghostLights.forEach(l => l.visible = togglePoint.checked);
+}
+
+if (toggleBackground) {
+  toggleBackground.onchange = (e) => {
+    if (backgroundScene) {
+      backgroundScene.visible = e.target.checked;
+    }
+  };
+
+  if (backgroundScene) {
+    backgroundScene.visible = toggleBackground.checked;
+  }
 }
 if (toggleFreeLook) {
     toggleFreeLook.onchange = (e) => {

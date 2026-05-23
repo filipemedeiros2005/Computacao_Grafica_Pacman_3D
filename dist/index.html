@@ -17,8 +17,8 @@
         }
       }
     </script>
-    <script type="module" crossorigin src="/assets/index-Bag1VrB4.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CAJqK781.css">
+    <script type="module" crossorigin src="/assets/index-BtJ7napo.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CAgAPhIh.css">
   </head>
   
   <body>
@@ -91,12 +91,25 @@
             <label for="toggle-point">Luzes Pontuais (Fantasmas):</label>
             <input type="checkbox" id="toggle-point" checked>
           </div>
+
+          <div class="setting-item">
+            <label for="toggle-background">Ambiente de Fundo (Blender):</label>
+            <input type="checkbox" id="toggle-background" checked>
+          </div>
         </div>
         <button id="closeSettingsButton" class="menu-btn small-btn">Fechar</button>
       </div>
     </div>
 
     <button id="backToMenuButton" class="menu-btn in-game-back-btn hidden">Voltar ao Menu</button>
+    <div id="scoreHud" class="score-hud hidden">
+      <span class="score-label">Pontos</span>
+      <span id="scoreValue" class="score-value">0</span>
+    </div>
+    <div id="livesHud" class="lives-hud hidden">
+      <span class="score-label">Vidas</span>
+      <span id="livesValue" class="score-value">3</span>
+    </div>
     <!-- 3. Aqui é injetado o jogo 3D do Three.js -->
     <div id="app"></div>
 

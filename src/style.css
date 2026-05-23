@@ -344,6 +344,68 @@ canvas {
     pointer-events: none;
 }
 
+.score-hud {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 45;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid rgba(96, 165, 250, 0.9);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.84);
+    color: #dbeafe;
+    font-family: sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 18px rgba(30, 64, 175, 0.25);
+    pointer-events: none;
+}
+
+.score-hud.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.score-label {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.score-value {
+    font-size: 1.35rem;
+    color: #ffd60a;
+    min-width: 3ch;
+    text-align: right;
+}
+
+.lives-hud {
+    position: fixed;
+    top: 74px;
+    right: 20px;
+    z-index: 45;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid rgba(96, 165, 250, 0.9);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.84);
+    color: #dbeafe;
+    font-family: sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 18px rgba(30, 64, 175, 0.25);
+    pointer-events: none;
+}
+
+.lives-hud.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
 .setting-item {
     display: flex;
     justify-content: space-between;
