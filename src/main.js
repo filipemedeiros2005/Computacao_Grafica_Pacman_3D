@@ -710,22 +710,7 @@ function resetGameEntities() {
 }
 
 function enterGameplayMode() {
-    const mainMenu = document.getElementById('mainMenu');
-    if (mainMenu) mainMenu.classList.add('hidden');
-
-    const backToMenuButton = document.getElementById('backToMenuButton');
-    if (backToMenuButton) backToMenuButton.classList.remove('hidden');
-
-    isFreeNavigationMode = false;
-    is3DView = false;
-    cameraAtiva = camera2D;
-    camera2DZoom.currentZoom = 1; // Reset do zoom
-    updateCamera2DZoom();
-    configureControlsForGameplayView();
-    if (controls) controls.enabled = false;
-
-    gameMusic.currentTime = 0; // Reinicia a faixa do início
-    gameMusic.play().catch(e => console.log("Erro ao tocar música do jogo:", e));
+  startGameplaySession({ resetEntities: true, resetMusic: true });
 }
 
 function enterFreeNavigationMode() {
@@ -760,9 +745,13 @@ window.addEventListener('keydown', (event) => {
     
     // Controlos do Menu e Atalhos
     if (event.key === 'Escape' || event.key === 'Enter') {
-        if (!mainMenu.classList.contains('hidden') && event.key === 'Enter') {
-            enterGameplayMode();
-        } else if (mainMenu.classList.contains('hidden') && event.key === 'Escape') {
+    if (!mainMenu.classList.contains('hidden') && event.key === 'Enter') {
+      if (hasActiveGameSession) {
+        resumePausedGameplay();
+      } else {
+        startGameplaySession({ resetEntities: true, resetMusic: true });
+      }
+    } else if (mainMenu.classList.contains('hidden') && event.key === 'Escape') {
             returnToMainMenu();
         }
         return;
@@ -1104,6 +1093,7 @@ animate();
 
 
 const playButton = document.getElementById('playButton');
+const restartButton = document.getElementById('restartButton');
 const freeNavigationButton = document.getElementById('freeNavigationButton');
 const charactersMenuButton = document.getElementById('charactersMenuButton');
 const backToMenuButton = document.getElementById('backToMenuButton');
@@ -1123,6 +1113,9 @@ const togglePoint = document.getElementById('toggle-point');
 const toggleFreeLook = document.getElementById('toggle-freelook');
 const volumeSlider = document.getElementById('volumeSlider');
 const sfxVolumeSlider = document.getElementById('sfxVolumeSlider');
+
+let hasActiveGameSession = false;
+let isGamePaused = false;
 
 // --- CONFIGURAÇÃO DAS MÚSICAS (MENU E JOGO) ---
 const menuMusic = new Audio(`${assetBase}audio/menu_theme.mp3`);
@@ -1162,6 +1155,79 @@ function playSFX(audioElement) {
     }
 }
 
+function syncMainMenuButtons() {
+  if (playButton) {
+    playButton.textContent = hasActiveGameSession ? 'Continuar' : 'Jogar';
+  }
+
+  if (restartButton) {
+    restartButton.classList.toggle('hidden', !hasActiveGameSession);
+    restartButton.disabled = !hasActiveGameSession;
+  }
+}
+
+function startGameplaySession({ resetEntities = false, resetMusic = true } = {}) {
+  if (resetEntities) {
+    resetGameEntities();
+  }
+
+  hasActiveGameSession = true;
+  isGamePaused = false;
+
+  const mainMenu = document.getElementById('mainMenu');
+  if (mainMenu) mainMenu.classList.add('hidden');
+  if (backToMenuButton) backToMenuButton.classList.remove('hidden');
+
+  isFreeNavigationMode = false;
+  is3DView = false;
+  cameraAtiva = camera2D;
+  camera2DZoom.currentZoom = 1;
+  updateCamera2DZoom();
+  configureControlsForGameplayView();
+  if (controls) controls.enabled = false;
+
+  if (resetMusic) {
+    gameMusic.currentTime = 0;
+  }
+
+  menuMusic.pause();
+  gameMusic.play().catch(e => console.log("Erro ao tocar música do jogo:", e));
+  syncMainMenuButtons();
+}
+
+function resumePausedGameplay() {
+  if (!hasActiveGameSession) {
+    startGameplaySession({ resetEntities: true, resetMusic: true });
+    return;
+  }
+
+  startGameplaySession({ resetEntities: false, resetMusic: false });
+}
+
+function restartGameplaySession() {
+  if (!hasActiveGameSession) {
+    return;
+  }
+
+  startGameplaySession({ resetEntities: true, resetMusic: true });
+}
+
+function pauseGameplayToMenu() {
+  if (!hasActiveGameSession) {
+    return;
+  }
+
+  isGamePaused = true;
+
+  const mainMenu = document.getElementById('mainMenu');
+  if (mainMenu) mainMenu.classList.remove('hidden');
+  if (backToMenuButton) backToMenuButton.classList.add('hidden');
+
+  gameMusic.pause();
+  menuMusic.play().catch(e => console.log(e));
+  syncMainMenuButtons();
+}
+
 startMenuMusic();
 document.addEventListener('pointerdown', startMenuMusic, { once: true });
 
@@ -1184,28 +1250,16 @@ if (volumeSlider) {
 // ----------------------------------------------
 
 function returnToMainMenu() {
-    const mainMenu = document.getElementById('mainMenu');
-    if (mainMenu) mainMenu.classList.remove('hidden');
-    if (backToMenuButton) backToMenuButton.classList.add('hidden');
-    isFreeNavigationMode = false;
-    is3DView = false;
-    cameraAtiva = camera2D;
-    camera2DZoom.currentZoom = 1; 
-    updateCamera2DZoom();
-    configureControlsForGameplayView();
-    if (controls) controls.enabled = false;
-
-    // Pára a do jogo (se estivesse a dar) e volta a ligar a do menu
-    gameMusic.pause();
-    startMenuMusic();
+  pauseGameplayToMenu();
 }
 
 // Botão JOGAR
 if (playButton) playButton.onclick = () => {
-    menuMusic.pause(); // Pára menu
-    gameMusic.currentTime = 0; 
-    gameMusic.play().catch(e => console.log(e)); // Arranca música do labirinto
-    enterGameplayMode(); 
+  resumePausedGameplay();
+};
+
+if (restartButton) restartButton.onclick = () => {
+  restartGameplaySession();
 };
 
 // Botão NAVEGAÇÃO LIVRE (ATUALIZADO: Modo silencioso)
@@ -1216,6 +1270,8 @@ if (freeNavigationButton) freeNavigationButton.onclick = () => {
 };
 
 if (backToMenuButton) backToMenuButton.onclick = returnToMainMenu;
+
+syncMainMenuButtons();
 if (charactersMenuButton) charactersMenuButton.onclick = () => window.location.href = './characters.html';
 if (exitButton) exitButton.onclick = () => { if(confirm("Tens a certeza que queres sair do jogo?")) window.location.href = "about:blank"; };
 

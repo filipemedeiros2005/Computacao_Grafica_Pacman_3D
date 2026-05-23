@@ -241,6 +241,23 @@ canvas {
     box-shadow: 0 0 15px rgba(96, 165, 250, 0.5);
 }
 
+.menu-btn.hidden {
+    display: none;
+}
+
+.menu-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.menu-btn:disabled:hover {
+    background: rgba(30, 64, 175, 0.4);
+    transform: none;
+    box-shadow: none;
+}
+
 /* --- JANELA DE INSTRUÇÕES (MODAL) --- */
 .modal-overlay {
     position: fixed;
