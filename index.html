@@ -9,7 +9,8 @@
     <script type="importmap">
       {
         "imports": {
-          "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+          "three": "https://unpkg.com/three@0.179.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.179.1/examples/jsm/"
         }
       }
     </script>
@@ -42,8 +43,9 @@
           <ul>
             <li><strong>W, A, S, D ou Setas:</strong> Mover o Pac-Man</li>
             <li><strong>Tecla 'V':</strong> Alternar entre vista 2D Clássica e 3D</li>
-            <li><strong>Tecla 'L':</strong> Habilitar a câmara 3D Livre</li>
+            <li><strong>Tecla 'L':</strong> Alternar entre câmara livre e câmara fixa na vista 3D</li>
             <li><strong>Rato (na vista 3D):</strong> Clica e arrasta para rodar a câmara</li>
+            
           </ul>
           <p><strong>Objetivo:</strong></p>
           <p>Come todas as pastilhas do labirinto e evita os fantasmas para não perderes o jogo!</p>
@@ -54,9 +56,18 @@
 
     <div id="settingsModal" class="modal-overlay hidden">
       <div class="modal-content">
-        <h2 class="modal-title">Definições Gráficas</h2>
+        <h2 class="modal-title">Definições</h2>
         <div class="modal-body">
-          <p><strong>Luzes do Jogo:</strong></p>
+          <div class="setting-item" style="margin-top: 20px;">
+            <label for="volumeSlider" style="font-weight: bold; font-size: 14px;">Volume da Música:</label>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.4" style="width: 80%; cursor: pointer;">
+          </div>
+
+          <div class="setting-item">
+            <label for="sfxVolumeSlider" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;">Volume dos Efeitos:</label>
+            <input type="range" id="sfxVolumeSlider" min="0" max="1" step="0.05" value="0.5" style="width: 80%; cursor: pointer;">
+          </div>
+        
 
           <div class="setting-item">
             <label for="toggle-freelook">Câmara Livre (Mouse):</label>

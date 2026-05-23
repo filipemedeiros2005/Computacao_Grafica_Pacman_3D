@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+// Importações locais usando o pacote npm que já tens instalado:
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const app = document.querySelector("#app");
 
@@ -69,6 +71,14 @@ const mazeWidth = mazeLayout[0].length * tileSize;
 const mazeDepth = mazeLayout.length * tileSize;
 const xOffset = -mazeWidth / 2 + tileSize / 2;
 const zOffset = -mazeDepth / 2 + tileSize / 2;
+
+function getAssetBase() {
+  if (import.meta.env?.BASE_URL) {
+    return import.meta.env.BASE_URL;
+  }
+
+  return './public/';
+}
 
 function updateCamera2DFraming() {
   const camera2DMargin = 8;
@@ -160,11 +170,36 @@ for (let row = 0; row < mazeLayout.length; row += 1) {
 }
 scene.add(wallsGroup);
 
-const floorGeometry = new THREE.PlaneGeometry(mazeWidth + 2, mazeDepth + 2);
-const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.95, metalness: 0 });
-const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
+// --- CARREGAR O CENÁRIO DO BLENDER ---
+const gltfLoader = new GLTFLoader();
+const assetBase = getAssetBase();
+
+gltfLoader.load(
+  `${assetBase}cenario.glb`,
+    (gltf) => {
+        const cenario = gltf.scene;
+
+        cenario.position.y = 4.8;
+        
+        // Aumentar o brilho (emissive) dos materiais neon importados para ficarem com estilo Synthwave
+        cenario.traverse((node) => {
+            if (node.isMesh && node.material) {
+                node.material.emissiveIntensity = 2.0; 
+                node.material.side = THREE.DoubleSide; // Torna-o visível dos dois lados
+            }
+        });
+
+        scene.add(cenario);
+        console.log("Cenário Synthwave carregado com sucesso!");
+    },
+    (xhr) => {
+        // Mostra o progresso do carregamento na consola do browser (F12)
+        console.log(`A carregar cenário: ${Math.round((xhr.loaded / xhr.total) * 100)}%`);
+    },
+    (error) => {
+        console.error('Erro ao carregar o cenário:', error);
+    }
+);
 
 // Pastilhas (Pellets)
 const pelletGeometry = new THREE.SphereGeometry(0.24, 8, 8);
@@ -688,6 +723,9 @@ function enterGameplayMode() {
     updateCamera2DZoom();
     configureControlsForGameplayView();
     if (controls) controls.enabled = false;
+
+    gameMusic.currentTime = 0; // Reinicia a faixa do início
+    gameMusic.play().catch(e => console.log("Erro ao tocar música do jogo:", e));
 }
 
 function enterFreeNavigationMode() {
@@ -897,6 +935,7 @@ function animate() {
           const pellet = pelletsGroup.children[i];
           if (pellet.position.distanceTo(pacman.position) < 0.8) {
               pelletsGroup.remove(pellet);
+              playSFX(chompSound);
           }
       }
 
@@ -905,6 +944,7 @@ function animate() {
           const pp = powerPelletsGroup.children[i];
           if (pp.position.distanceTo(pacman.position) < 1.0) {
               powerPelletsGroup.remove(pp);
+              playSFX(powerupSound);
               if ((pp.userData.collectibleType || 'power') === 'power') {
                   // Fantasmas ficam com medo!
                   ghostsData.forEach(ghost => {
@@ -1062,7 +1102,7 @@ function animate() {
 
 animate();
 
-// --- LÓGICA DO MENU E DEFINIÇÕES ---
+
 const playButton = document.getElementById('playButton');
 const freeNavigationButton = document.getElementById('freeNavigationButton');
 const charactersMenuButton = document.getElementById('charactersMenuButton');
@@ -1081,6 +1121,67 @@ const toggleAmbient = document.getElementById('toggle-ambient');
 const toggleDirectional = document.getElementById('toggle-directional');
 const togglePoint = document.getElementById('toggle-point');
 const toggleFreeLook = document.getElementById('toggle-freelook');
+const volumeSlider = document.getElementById('volumeSlider');
+const sfxVolumeSlider = document.getElementById('sfxVolumeSlider');
+
+// --- CONFIGURAÇÃO DAS MÚSICAS (MENU E JOGO) ---
+const menuMusic = new Audio(`${assetBase}audio/menu_theme.mp3`);
+menuMusic.loop = true;  
+menuMusic.volume = 0.4;
+menuMusic.preload = 'auto';
+
+const gameMusic = new Audio(`${assetBase}audio/game_theme.mp3`);
+gameMusic.loop = true;
+gameMusic.volume = 0.3; 
+
+// --- NOVA: CONFIGURAÇÃO DOS EFEITOS SONOROS ---
+const chompSound = new Audio(`${assetBase}audio/chomp.mp3`);
+chompSound.volume = 0.5;
+
+const powerupSound = new Audio(`${assetBase}audio/powerup.mp3`);
+powerupSound.volume = 0.6;
+
+function startMenuMusic() {
+  if (menuMusic.paused) {
+    menuMusic.currentTime = 0;
+    menuMusic.muted = true;
+    menuMusic.play().then(() => {
+      menuMusic.muted = false;
+      menuMusic.volume = 0.4;
+    }).catch(() => {});
+  }
+}
+
+// Função inteligente para tocar sons rápidos sem se engasgarem
+function playSFX(audioElement) {
+    // Só toca os efeitos se o jogo estiver a decorrer
+    const mainMenu = document.getElementById('mainMenu');
+    if (mainMenu && mainMenu.classList.contains('hidden') && !isFreeNavigationMode) {
+        audioElement.currentTime = 0; // Volta ao início do som instantaneamente
+        audioElement.play().catch(e => console.log("SFX bloqueado"));
+    }
+}
+
+startMenuMusic();
+document.addEventListener('pointerdown', startMenuMusic, { once: true });
+
+// --- EVENTO DO VOLUME CORRIGIDO ---
+if (volumeSlider) {
+    volumeSlider.oninput = (e) => {
+        const val = parseFloat(e.target.value); // Lê o valor exato do slider
+        menuMusic.volume = val;
+        gameMusic.volume = val * 0.75; // A do jogo fica sempre um pouco mais baixa
+    };
+
+    if (sfxVolumeSlider) {
+    sfxVolumeSlider.oninput = (e) => {
+        const val = parseFloat(e.target.value);
+        chompSound.volume = val;
+        powerupSound.volume = val; 
+    };
+}
+}
+// ----------------------------------------------
 
 function returnToMainMenu() {
     const mainMenu = document.getElementById('mainMenu');
@@ -1089,14 +1190,31 @@ function returnToMainMenu() {
     isFreeNavigationMode = false;
     is3DView = false;
     cameraAtiva = camera2D;
-    camera2DZoom.currentZoom = 1; // Reset do zoom
+    camera2DZoom.currentZoom = 1; 
     updateCamera2DZoom();
     configureControlsForGameplayView();
     if (controls) controls.enabled = false;
+
+    // Pára a do jogo (se estivesse a dar) e volta a ligar a do menu
+    gameMusic.pause();
+    startMenuMusic();
 }
 
-if (playButton) playButton.onclick = enterGameplayMode;
-if (freeNavigationButton) freeNavigationButton.onclick = enterFreeNavigationMode;
+// Botão JOGAR
+if (playButton) playButton.onclick = () => {
+    menuMusic.pause(); // Pára menu
+    gameMusic.currentTime = 0; 
+    gameMusic.play().catch(e => console.log(e)); // Arranca música do labirinto
+    enterGameplayMode(); 
+};
+
+// Botão NAVEGAÇÃO LIVRE (ATUALIZADO: Modo silencioso)
+if (freeNavigationButton) freeNavigationButton.onclick = () => {
+    menuMusic.pause(); // Pára a música do menu
+    gameMusic.pause(); // Garante que a música do jogo NÃO toca
+    enterFreeNavigationMode(); // Entra no modo de exploração em total silêncio
+};
+
 if (backToMenuButton) backToMenuButton.onclick = returnToMainMenu;
 if (charactersMenuButton) charactersMenuButton.onclick = () => window.location.href = './characters.html';
 if (exitButton) exitButton.onclick = () => { if(confirm("Tens a certeza que queres sair do jogo?")) window.location.href = "about:blank"; };
@@ -1111,7 +1229,7 @@ if (toggleAmbient) toggleAmbient.onchange = (e) => { if (ambientLight) ambientLi
 if (toggleDirectional) toggleDirectional.onchange = (e) => { if (directionalLight) directionalLight.visible = e.target.checked; };
 if (togglePoint) {
     togglePoint.onchange = (e) => ghostLights.forEach(l => l.visible = e.target.checked);
-    ghostLights.forEach(l => l.visible = togglePoint.checked); // Sincroniza o arranque
+    ghostLights.forEach(l => l.visible = togglePoint.checked);
 }
 if (toggleFreeLook) {
     toggleFreeLook.onchange = (e) => {

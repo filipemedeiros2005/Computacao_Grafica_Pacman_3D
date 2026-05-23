@@ -6,6 +6,14 @@ const previousCharacterButton = document.querySelector("#previousCharacterButton
 const nextCharacterButton = document.querySelector("#nextCharacterButton");
 const characterNameLabel = document.querySelector("#characterNameLabel");
 
+function getAssetBase() {
+  if (import.meta.env?.BASE_URL) {
+    return import.meta.env.BASE_URL;
+  }
+
+  return './public/';
+}
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -376,3 +384,25 @@ function animate() {
 }
 
 animate();
+
+// --- MÚSICA DO MENU DE PERSONAGENS ---
+// Nota: Podes mudar o nome do ficheiro aqui se quiseres uma música diferente!
+const assetBase = getAssetBase();
+const charMusic = new Audio(`${assetBase}audio/characters_theme.mp3`); 
+charMusic.loop = true;
+charMusic.volume = 0.4;
+charMusic.preload = 'auto';
+
+function startCharacterMusic() {
+  if (charMusic.paused) {
+    charMusic.currentTime = 0;
+    charMusic.muted = true;
+    charMusic.play().then(() => {
+      charMusic.muted = false;
+      charMusic.volume = 0.4;
+    }).catch(() => {});
+  }
+}
+
+startCharacterMusic();
+document.addEventListener('pointerdown', startCharacterMusic, { once: true });
