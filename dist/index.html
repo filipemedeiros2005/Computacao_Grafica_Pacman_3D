@@ -17,8 +17,8 @@
         }
       }
     </script>
-    <script type="module" crossorigin src="/assets/index-BtJ7napo.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CAgAPhIh.css">
+    <script type="module" crossorigin src="/assets/index-C-cuVI1z.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BZ_3b1qE.css">
   </head>
   
   <body>
@@ -30,6 +30,7 @@
         <button id="restartButton" class="menu-btn hidden">Reiniciar</button>
         <button id="freeNavigationButton" class="menu-btn">Navegação Livre</button>
         <button id="charactersMenuButton" class="menu-btn">Personagens</button>
+        <button id="leaderboardButton" class="menu-btn">Tabela de Classificação</button>
         <button id="settingsButton" class="menu-btn">Definições</button>
         <button id="instructionsButton" class="menu-btn">Instruções</button>
         
@@ -57,6 +58,49 @@
       </div>
     </div>
 
+    <div id="leaderboardModal" class="modal-overlay hidden">
+      <div class="modal-content leaderboard-modal">
+        <h2 class="modal-title">Tabela de Classificação</h2>
+        <div class="modal-body leaderboard-body">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th>Lugar</th>
+                <th>Nome</th>
+                <th>Pontuação</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+          </table>
+        </div>
+        <button id="closeLeaderboardButton" class="menu-btn small-btn">Fechar</button>
+      </div>
+    </div>
+
+    <div id="playerNameModal" class="modal-overlay hidden">
+      <div class="modal-content player-name-modal">
+        <h2 class="modal-title">Novo Jogo</h2>
+        <div class="modal-body player-name-body">
+          <p>Escreve um nome de 3 carateres para registar a tua pontuação.</p>
+          <input
+            id="playerNameInput"
+            class="player-name-input"
+            type="text"
+            maxlength="3"
+            minlength="3"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="ABC"
+          />
+          <p id="playerNameError" class="player-name-error hidden">O nome tem de ter exatamente 3 carateres.</p>
+        </div>
+        <div class="player-name-actions">
+          <button id="confirmPlayerNameButton" class="menu-btn small-btn">Começar</button>
+          <button id="cancelPlayerNameButton" class="menu-btn small-btn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
     <div id="settingsModal" class="modal-overlay hidden">
       <div class="modal-content">
         <h2 class="modal-title">Definições</h2>
@@ -73,7 +117,7 @@
         
 
           <div class="setting-item">
-            <label for="toggle-freelook">Câmara Livre (Mouse):</label>
+            <label for="toggle-freelook">Câmara Livre (Pode-se ativar durante o jogo):</label>
             <input type="checkbox" id="toggle-freelook">
           </div>
           
@@ -93,7 +137,7 @@
           </div>
 
           <div class="setting-item">
-            <label for="toggle-background">Ambiente de Fundo (Blender):</label>
+            <label for="toggle-background">Ambiente de Fundo:</label>
             <input type="checkbox" id="toggle-background" checked>
           </div>
         </div>

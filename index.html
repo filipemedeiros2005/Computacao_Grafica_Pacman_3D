@@ -28,6 +28,7 @@
         <button id="restartButton" class="menu-btn hidden">Reiniciar</button>
         <button id="freeNavigationButton" class="menu-btn">Navegação Livre</button>
         <button id="charactersMenuButton" class="menu-btn">Personagens</button>
+        <button id="leaderboardButton" class="menu-btn">Tabela de Classificação</button>
         <button id="settingsButton" class="menu-btn">Definições</button>
         <button id="instructionsButton" class="menu-btn">Instruções</button>
         
@@ -52,6 +53,49 @@
           <p>Come todas as pastilhas do labirinto e evita os fantasmas para não perderes o jogo!</p>
         </div>
         <button id="closeInstructionsButton" class="menu-btn small-btn">Fechar</button>
+      </div>
+    </div>
+
+    <div id="leaderboardModal" class="modal-overlay hidden">
+      <div class="modal-content leaderboard-modal">
+        <h2 class="modal-title">Tabela de Classificação</h2>
+        <div class="modal-body leaderboard-body">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th>Lugar</th>
+                <th>Nome</th>
+                <th>Pontuação</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+          </table>
+        </div>
+        <button id="closeLeaderboardButton" class="menu-btn small-btn">Fechar</button>
+      </div>
+    </div>
+
+    <div id="playerNameModal" class="modal-overlay hidden">
+      <div class="modal-content player-name-modal">
+        <h2 class="modal-title">Novo Jogo</h2>
+        <div class="modal-body player-name-body">
+          <p>Escreve um nome de 3 carateres para registar a tua pontuação.</p>
+          <input
+            id="playerNameInput"
+            class="player-name-input"
+            type="text"
+            maxlength="3"
+            minlength="3"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="ABC"
+          />
+          <p id="playerNameError" class="player-name-error hidden">O nome tem de ter exatamente 3 carateres.</p>
+        </div>
+        <div class="player-name-actions">
+          <button id="confirmPlayerNameButton" class="menu-btn small-btn">Começar</button>
+          <button id="cancelPlayerNameButton" class="menu-btn small-btn">Cancelar</button>
+        </div>
       </div>
     </div>
 

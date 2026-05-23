@@ -744,6 +744,22 @@ function enterFreeNavigationMode() {
 
 window.addEventListener('keydown', (event) => {
     const mainMenu = document.getElementById('mainMenu');
+
+    if (isNameEntryOpen) {
+      if (event.key === 'Enter') {
+        startGameWithEnteredName();
+      } else if (event.key === 'Escape') {
+        closeNameEntryModal();
+      }
+      return;
+    }
+
+    if (isAnySettingsModalOpen()) {
+      if (event.key === 'Escape') {
+        closeAllOpenModals();
+      }
+      return;
+    }
     
     // Controlos do Menu e Atalhos
     if (event.key === 'Enter') {
@@ -751,7 +767,7 @@ window.addEventListener('keydown', (event) => {
         if (hasActiveGameSession) {
           resumePausedGameplay();
         } else {
-          startGameplaySession({ resetEntities: true, resetMusic: true });
+          openNameEntryModal('new');
         }
       }
       return;
@@ -1122,11 +1138,20 @@ const playButton = document.getElementById('playButton');
 const restartButton = document.getElementById('restartButton');
 const freeNavigationButton = document.getElementById('freeNavigationButton');
 const charactersMenuButton = document.getElementById('charactersMenuButton');
+const leaderboardButton = document.getElementById('leaderboardButton');
 const backToMenuButton = document.getElementById('backToMenuButton');
 
 const instructionsButton = document.getElementById('instructionsButton');
 const instructionsModal = document.getElementById('instructionsModal');
 const closeInstructionsButton = document.getElementById('closeInstructionsButton');
+const leaderboardModal = document.getElementById('leaderboardModal');
+const leaderboardBody = document.getElementById('leaderboardBody');
+const closeLeaderboardButton = document.getElementById('closeLeaderboardButton');
+const playerNameModal = document.getElementById('playerNameModal');
+const playerNameInput = document.getElementById('playerNameInput');
+const playerNameError = document.getElementById('playerNameError');
+const confirmPlayerNameButton = document.getElementById('confirmPlayerNameButton');
+const cancelPlayerNameButton = document.getElementById('cancelPlayerNameButton');
 const exitButton = document.getElementById('exitButton');
 
 const settingsButton = document.getElementById('settingsButton');
@@ -1149,6 +1174,181 @@ let hasActiveGameSession = false;
 let isGamePaused = false;
 let score = 0;
 let lives = 3;
+let currentPlayerName = '---';
+let isNameEntryOpen = false;
+let pendingGameStartAction = 'new';
+
+const leaderboardStorageKey = 'pacman3dLeaderboard';
+
+function sanitizePlayerName(value) {
+  return value.replace(/\s+/g, '').toUpperCase().slice(0, 3);
+}
+
+function normalizeLeaderboardEntry(entry) {
+  if (typeof entry === 'number') {
+    return { name: '---', score: entry };
+  }
+
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const scoreValue = Number(entry.score);
+  if (!Number.isFinite(scoreValue)) {
+    return null;
+  }
+
+  return {
+    name: sanitizePlayerName(String(entry.name || '---')) || '---',
+    score: scoreValue,
+  };
+}
+
+function loadLeaderboardEntries() {
+  try {
+    const rawScores = localStorage.getItem(leaderboardStorageKey);
+    const parsedScores = rawScores ? JSON.parse(rawScores) : [];
+    if (!Array.isArray(parsedScores)) {
+      return [];
+    }
+
+    return parsedScores
+      .map(normalizeLeaderboardEntry)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function saveLeaderboardScore(playerName, newScore) {
+  const updatedScores = [...loadLeaderboardEntries(), {
+    name: sanitizePlayerName(playerName) || '---',
+    score: newScore,
+  }]
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5);
+
+  localStorage.setItem(leaderboardStorageKey, JSON.stringify(updatedScores));
+}
+
+function renderLeaderboard() {
+  if (!leaderboardBody) {
+    return;
+  }
+
+  const scores = loadLeaderboardEntries();
+  leaderboardBody.innerHTML = '';
+
+  for (let index = 0; index < 5; index += 1) {
+    const row = document.createElement('tr');
+    const rankCell = document.createElement('td');
+    const nameCell = document.createElement('td');
+    const scoreCell = document.createElement('td');
+
+    rankCell.className = 'leaderboard-rank';
+    rankCell.textContent = String(index + 1);
+
+    if (scores[index] !== undefined) {
+      nameCell.textContent = scores[index].name;
+      scoreCell.textContent = String(scores[index].score);
+    } else {
+      nameCell.textContent = '(POR PREENCHER)';
+      nameCell.className = 'leaderboard-empty';
+      scoreCell.textContent = '-';
+      scoreCell.className = 'leaderboard-empty';
+    }
+
+    row.append(rankCell, nameCell, scoreCell);
+    leaderboardBody.appendChild(row);
+  }
+}
+
+function openLeaderboardModal() {
+  renderLeaderboard();
+  if (leaderboardModal) {
+    leaderboardModal.classList.remove('hidden');
+  }
+}
+
+function closeLeaderboardModal() {
+  if (leaderboardModal) {
+    leaderboardModal.classList.add('hidden');
+  }
+}
+
+function openNameEntryModal(action) {
+  pendingGameStartAction = action;
+  isNameEntryOpen = true;
+
+  if (playerNameError) {
+    playerNameError.classList.add('hidden');
+  }
+
+  if (playerNameInput) {
+    playerNameInput.value = '';
+  }
+
+  if (playerNameModal) {
+    playerNameModal.classList.remove('hidden');
+  }
+
+  if (playerNameInput) {
+    playerNameInput.focus();
+  }
+}
+
+function closeNameEntryModal() {
+  isNameEntryOpen = false;
+
+  if (playerNameModal) {
+    playerNameModal.classList.add('hidden');
+  }
+
+  if (playerNameError) {
+    playerNameError.classList.add('hidden');
+  }
+}
+
+function isAnySettingsModalOpen() {
+  return Boolean(
+    (instructionsModal && !instructionsModal.classList.contains('hidden')) ||
+    (settingsModal && !settingsModal.classList.contains('hidden')) ||
+    (leaderboardModal && !leaderboardModal.classList.contains('hidden')) ||
+    isNameEntryOpen
+  );
+}
+
+function closeAllOpenModals() {
+  if (instructionsModal) {
+    instructionsModal.classList.add('hidden');
+  }
+
+  if (settingsModal) {
+    settingsModal.classList.add('hidden');
+  }
+
+  closeLeaderboardModal();
+  closeNameEntryModal();
+}
+
+function startGameWithEnteredName() {
+  if (!playerNameInput) {
+    return;
+  }
+
+  const enteredName = sanitizePlayerName(playerNameInput.value);
+  if (enteredName.length !== 3) {
+    if (playerNameError) {
+      playerNameError.classList.remove('hidden');
+    }
+    playerNameInput.focus();
+    return;
+  }
+
+  currentPlayerName = enteredName;
+  closeNameEntryModal();
+  startGameplaySession({ resetEntities: true, resetMusic: true });
+}
 
 function updateScoreHud() {
   if (scoreValue) {
@@ -1302,6 +1502,7 @@ function resetPacmanAfterHit() {
 }
 
 function endGameOver() {
+  saveLeaderboardScore(currentPlayerName, score);
   hasActiveGameSession = false;
   isGamePaused = false;
 
@@ -1384,11 +1585,15 @@ function returnToMainMenu() {
 
 // Botão JOGAR
 if (playButton) playButton.onclick = () => {
-  resumePausedGameplay();
+  if (hasActiveGameSession) {
+    resumePausedGameplay();
+  } else {
+    openNameEntryModal('new');
+  }
 };
 
 if (restartButton) restartButton.onclick = () => {
-  restartGameplaySession();
+  openNameEntryModal('restart');
 };
 
 // Botão NAVEGAÇÃO LIVRE (ATUALIZADO: Modo silencioso)
@@ -1397,6 +1602,20 @@ if (freeNavigationButton) freeNavigationButton.onclick = () => {
     gameMusic.pause(); // Garante que a música do jogo NÃO toca
     enterFreeNavigationMode(); // Entra no modo de exploração em total silêncio
 };
+
+if (leaderboardButton) leaderboardButton.onclick = openLeaderboardModal;
+if (closeLeaderboardButton) closeLeaderboardButton.onclick = closeLeaderboardModal;
+if (confirmPlayerNameButton) confirmPlayerNameButton.onclick = startGameWithEnteredName;
+if (cancelPlayerNameButton) cancelPlayerNameButton.onclick = closeNameEntryModal;
+
+if (playerNameInput) {
+  playerNameInput.addEventListener('input', () => {
+    playerNameInput.value = sanitizePlayerName(playerNameInput.value);
+    if (playerNameError) {
+      playerNameError.classList.toggle('hidden', playerNameInput.value.length === 3);
+    }
+  });
+}
 
 if (backToMenuButton) backToMenuButton.onclick = () => {
   if (isFreeNavigationMode) {

@@ -308,6 +308,93 @@ canvas {
     line-height: 1.6;
 }
 
+.leaderboard-modal {
+    width: min(420px, 90vw);
+}
+
+.leaderboard-body {
+    display: flex;
+    justify-content: center;
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #dbeafe;
+    font-size: 1rem;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(96, 165, 250, 0.2);
+    text-align: left;
+}
+
+.leaderboard-table th {
+    color: #ffd60a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.9rem;
+}
+
+.leaderboard-rank {
+    width: 64px;
+    color: #93c5fd;
+}
+
+.leaderboard-empty {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.player-name-modal {
+    width: min(420px, 90vw);
+}
+
+.player-name-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+}
+
+.player-name-body p {
+    margin: 0;
+}
+
+.player-name-input {
+    width: min(180px, 100%);
+    align-self: center;
+    padding: 12px 14px;
+    border: 2px solid #60a5fa;
+    border-radius: 10px;
+    background: rgba(3, 7, 18, 0.9);
+    color: #dbeafe;
+    font-size: 1.1rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    outline: none;
+}
+
+.player-name-input:focus {
+    border-color: #ffd60a;
+    box-shadow: 0 0 0 3px rgba(255, 214, 10, 0.18);
+}
+
+.player-name-error {
+    margin: 0;
+    color: #fca5a5;
+    font-size: 0.95rem;
+}
+
+.player-name-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .modal-body ul {
     margin-top: 5px;
     margin-bottom: 15px;
