@@ -194,7 +194,15 @@ canvas {
     align-items: center;
     justify-content: center;
     z-index: 100; /* Garante que fica por cima do jogo 3D */
-    transition: opacity 0.4s ease, visibility 0.4s ease;
+    backdrop-filter: blur(0px);
+    transform: scale(1);
+    opacity: 1;
+    visibility: visible;
+    transition:
+        opacity 0.32s ease,
+        visibility 0.32s ease,
+        transform 0.32s ease,
+        backdrop-filter 0.32s ease;
 }
 
 /* Classe que vamos adicionar com JavaScript para esconder o menu */
@@ -202,6 +210,8 @@ canvas {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+    transform: scale(0.985) translateY(10px);
+    backdrop-filter: blur(8px);
 }
 
 .menu-title {
@@ -213,6 +223,7 @@ canvas {
     text-transform: uppercase;
     letter-spacing: 4px;
     text-shadow: 0 0 20px rgba(255, 214, 10, 0.4);
+    animation: menuEntrance 420ms ease both;
 }
 
 .menu-buttons {
@@ -233,6 +244,35 @@ canvas {
     transition: all 0.2s ease;
     min-width: 240px;
     text-transform: uppercase;
+    animation: menuEntrance 420ms ease both;
+}
+
+.menu-buttons .menu-btn:nth-child(1) {
+    animation-delay: 60ms;
+}
+
+.menu-buttons .menu-btn:nth-child(2) {
+    animation-delay: 120ms;
+}
+
+.menu-buttons .menu-btn:nth-child(3) {
+    animation-delay: 180ms;
+}
+
+.menu-buttons .menu-btn:nth-child(4) {
+    animation-delay: 240ms;
+}
+
+.menu-buttons .menu-btn:nth-child(5) {
+    animation-delay: 300ms;
+}
+
+.menu-buttons .menu-btn:nth-child(6) {
+    animation-delay: 360ms;
+}
+
+.menu-buttons .menu-btn:nth-child(7) {
+    animation-delay: 420ms;
 }
 
 .menu-btn:hover {
@@ -256,6 +296,18 @@ canvas {
     background: rgba(30, 64, 175, 0.4);
     transform: none;
     box-shadow: none;
+}
+
+@keyframes menuEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* --- JANELA DE INSTRUÇÕES (MODAL) --- */

@@ -245,6 +245,41 @@ function generateValidPositions(count = 3, excludePositions = []) {
   return selectedPositions;
 }
 
+function configureCollectibleMotion(collectible, type, index = 0) {
+  const motionProfiles = {
+    power: {
+      spinY: 0.42,
+      bobSpeed: 1.7,
+      bobAmount: 0.085,
+    },
+    cherry: {
+      spinY: 0.78,
+      bobSpeed: 2.2,
+      bobAmount: 0.05,
+    },
+    orange: {
+      spinY: 0.46,
+      bobSpeed: 1.55,
+      bobAmount: 0.04,
+    },
+    banana: {
+      spinY: 0.32,
+      bobSpeed: 1.85,
+      bobAmount: 0.045,
+    },
+  };
+
+  const profile = motionProfiles[type] || motionProfiles.power;
+  collectible.userData.motion = {
+    type,
+    baseY: collectible.position.y,
+    phase: Math.random() * Math.PI * 2 + index * 0.65,
+    spinY: profile.spinY,
+    bobSpeed: profile.bobSpeed,
+    bobAmount: profile.bobAmount,
+  };
+}
+
 function populateCollectibles() {
   pelletsGroup.clear();
   powerPelletsGroup.clear();
@@ -266,6 +301,11 @@ function populateCollectibles() {
         if ((row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23)) {
           const pp = new THREE.Mesh(powerPelletGeo, powerPelletMat);
           pp.userData.collectibleType = 'power';
+          pp.userData.baseY = 0.6;
+          pp.userData.bobPhase = Math.random() * Math.PI * 2;
+          pp.userData.spinSpeed = 0.42 + Math.random() * 0.1;
+          pp.userData.bobSpeed = 1.7 + Math.random() * 0.3;
+          pp.userData.bobAmount = 0.085;
           pp.position.set(worldPos.x, 0.6, worldPos.z);
           // Adicionar luz ao power pellet
           const ppLight = new THREE.PointLight(0xffffff, 12, 6);
@@ -287,6 +327,7 @@ function populateCollectibles() {
     const cherryWorld = gridToWorld(cherryPos.row, cherryPos.col);
     cherryModel.position.set(cherryWorld.x, 0.5, cherryWorld.z);
     cherryModel.userData.collectibleType = 'cherry';
+    configureCollectibleMotion(cherryModel, 'cherry');
     // Adicionar luz à cereja
     const cherryLight = new THREE.PointLight(0xdc2626, 10, 6);
     cherryLight.position.set(0, 0, 0);
@@ -299,6 +340,7 @@ function populateCollectibles() {
     const orangeWorld = gridToWorld(orangePos.row, orangePos.col);
     orangeModel.position.set(orangeWorld.x, 0.5, orangeWorld.z);
     orangeModel.userData.collectibleType = 'orange';
+    configureCollectibleMotion(orangeModel, 'orange');
     // Adicionar luz à laranja
     const orangeLight = new THREE.PointLight(0xff9500, 10, 6);
     orangeLight.position.set(0, 0, 0);
@@ -311,6 +353,7 @@ function populateCollectibles() {
     const bananaWorld = gridToWorld(bananaPos.row, bananaPos.col);
     bananaModel.position.set(bananaWorld.x, 0.5, bananaWorld.z);
     bananaModel.userData.collectibleType = 'banana';
+    configureCollectibleMotion(bananaModel, 'banana');
     // Adicionar luz à banana
     const bananaLight = new THREE.PointLight(0xffd60a, 10, 6);
     bananaLight.position.set(0, 0, 0);
@@ -445,32 +488,110 @@ function createOrangeModel() {
 // --- NOVO: BANANA 3D ---
 function createBananaModel() {
   const banana = new THREE.Group();
-  
-  // Corpo principal (alongado e ligeiramente curvo)
-  const bananaGeo = new THREE.CylinderGeometry(0.15, 0.13, 0.7, 16, 8);
-  const bananaMat = new THREE.MeshStandardMaterial({ 
-    color: 0xffd60a, 
-    roughness: 0.35, 
-    metalness: 0.1,
-    emissive: 0xffa500,
-    emissiveIntensity: 0.1
+
+  const bananaMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffde59,
+    roughness: 0.62,
+    metalness: 0.02,
+    emissive: 0xffc400,
+    emissiveIntensity: 0.025,
   });
-  const bananaBody = new THREE.Mesh(bananaGeo, bananaMat);
-  bananaBody.rotation.z = Math.PI / 4; // Inclinação
-  banana.add(bananaBody);
-  
-  // Ponta castanha (topo da banana)
-  const tipGeo = new THREE.SphereGeometry(0.12, 16, 16);
-  const tipMat = new THREE.MeshStandardMaterial({ 
+
+  const bananaSegments = [
+    { position: [-0.52, -0.02, 0.00], rotation: [0.00, 0.00, 0.10], scale: [0.18, 0.18, 0.14] },
+    { position: [-0.39, 0.02, 0.00], rotation: [0.00, 0.00, 0.12], scale: [0.18, 0.19, 0.14] },
+    { position: [-0.24, 0.08, 0.00], rotation: [0.00, 0.00, 0.15], scale: [0.20, 0.20, 0.15] },
+    { position: [-0.08, 0.13, 0.00], rotation: [0.00, 0.00, 0.13], scale: [0.21, 0.21, 0.15] },
+    { position: [0.10, 0.16, 0.00], rotation: [0.00, 0.00, 0.09], scale: [0.22, 0.21, 0.15] },
+    { position: [0.28, 0.15, 0.00], rotation: [0.00, 0.00, 0.04], scale: [0.21, 0.20, 0.15] },
+    { position: [0.44, 0.12, 0.00], rotation: [0.00, 0.00, -0.02], scale: [0.18, 0.18, 0.14] },
+    { position: [0.56, 0.07, 0.00], rotation: [0.00, 0.00, -0.08], scale: [0.16, 0.16, 0.13] },
+  ];
+
+  bananaSegments.forEach((segment) => {
+    const piece = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), bananaMaterial);
+    piece.position.set(segment.position[0], segment.position[1], segment.position[2]);
+    piece.rotation.set(segment.rotation[0], segment.rotation[1], segment.rotation[2]);
+    piece.scale.set(segment.scale[0], segment.scale[1], segment.scale[2]);
+    banana.add(piece);
+  });
+
+  const glueMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf4cb42,
+    roughness: 0.68,
+    metalness: 0.01,
+  });
+
+  const gluePieces = [
+    { position: [-0.45, -0.01, 0.00], rotation: 0.09, scale: [0.12, 0.08, 0.12] },
+    { position: [-0.31, 0.04, 0.00], rotation: 0.12, scale: [0.13, 0.08, 0.12] },
+    { position: [-0.17, 0.09, 0.00], rotation: 0.14, scale: [0.14, 0.09, 0.12] },
+    { position: [-0.01, 0.13, 0.00], rotation: 0.11, scale: [0.15, 0.09, 0.12] },
+    { position: [0.16, 0.15, 0.00], rotation: 0.08, scale: [0.15, 0.09, 0.12] },
+    { position: [0.33, 0.14, 0.00], rotation: 0.03, scale: [0.14, 0.08, 0.12] },
+    { position: [0.48, 0.10, 0.00], rotation: -0.03, scale: [0.12, 0.08, 0.12] },
+  ];
+
+  gluePieces.forEach((pieceData) => {
+    const gluePiece = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glueMaterial);
+    gluePiece.position.set(pieceData.position[0], pieceData.position[1], pieceData.position[2] + 0.035);
+    gluePiece.rotation.z = pieceData.rotation;
+    gluePiece.scale.set(pieceData.scale[0], pieceData.scale[1], pieceData.scale[2]);
+    banana.add(gluePiece);
+  });
+
+  const stemMaterial = new THREE.MeshStandardMaterial({
     color: 0x6b4423,
-    roughness: 0.6,
-    metalness: 0.02
+    roughness: 0.82,
+    metalness: 0.01,
   });
-  const tip = new THREE.Mesh(tipGeo, tipMat);
-  tip.scale.set(1, 0.7, 1);
-  tip.position.set(0.35, 0.45, 0);
-  banana.add(tip);
-  
+
+  const stem = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.09), stemMaterial);
+  stem.position.set(0.63, 0.17, 0.00);
+  stem.rotation.z = -Math.PI / 10;
+  banana.add(stem);
+
+  const blossom = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.08), stemMaterial);
+  blossom.position.set(-0.60, -0.03, 0.00);
+  blossom.rotation.z = Math.PI / 8;
+  banana.add(blossom);
+
+  const topRidgeMaterial = new THREE.MeshStandardMaterial({
+    color: 0xd1a11f,
+    roughness: 0.62,
+    metalness: 0.01,
+  });
+
+  const topRidge = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.03, 0.05), topRidgeMaterial);
+  topRidge.position.set(-0.03, 0.20, 0.07);
+  topRidge.rotation.z = -Math.PI / 14;
+  banana.add(topRidge);
+
+  const sideShadow = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.035, 0.03), new THREE.MeshStandardMaterial({
+    color: 0xc78d19,
+    roughness: 0.7,
+    metalness: 0.0,
+    transparent: true,
+    opacity: 0.8,
+  }));
+  sideShadow.position.set(-0.02, 0.09, -0.06);
+  sideShadow.rotation.z = -Math.PI / 13;
+  banana.add(sideShadow);
+
+  const joiner = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.09, 0.09), new THREE.MeshStandardMaterial({
+    color: 0xe7bf34,
+    roughness: 0.74,
+    metalness: 0.0,
+    transparent: true,
+    opacity: 0.55,
+  }));
+  joiner.position.set(-0.03, 0.07, -0.02);
+  joiner.rotation.z = -Math.PI / 14;
+  banana.add(joiner);
+
+  banana.rotation.z = -Math.PI / 11;
+  banana.position.set(0, 0.03, 0);
+
   return banana;
 }
 
@@ -892,6 +1013,24 @@ function animate() {
 
   directionalLight.position.x = 10 * Math.cos(t * 0.3);
   directionalLight.position.z = 10 * Math.sin(t * 0.3);
+
+    for (const collectible of powerPelletsGroup.children) {
+      const type = collectible.userData.collectibleType || '';
+      const motion = collectible.userData.motion;
+
+      if (!motion) {
+        continue;
+      }
+
+      if (type === 'power') {
+        collectible.rotation.y += motion.spinY * dt;
+        collectible.position.y = motion.baseY + Math.sin(t * motion.bobSpeed + motion.phase) * motion.bobAmount;
+        continue;
+      }
+
+      collectible.rotation.y += motion.spinY * dt;
+      collectible.position.y = motion.baseY + Math.sin(t * motion.bobSpeed + motion.phase) * motion.bobAmount;
+    }
 
   // Só processa gameplay quando o menu está fechado e o modo livre está desligado
   const mainMenu = document.getElementById('mainMenu');
