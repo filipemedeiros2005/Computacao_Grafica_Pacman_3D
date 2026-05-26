@@ -1286,6 +1286,7 @@ const closeInstructionsButton = document.getElementById('closeInstructionsButton
 const leaderboardModal = document.getElementById('leaderboardModal');
 const leaderboardBody = document.getElementById('leaderboardBody');
 const closeLeaderboardButton = document.getElementById('closeLeaderboardButton');
+const clearLeaderboardButton = document.getElementById('clearLeaderboardButton');
 const playerNameModal = document.getElementById('playerNameModal');
 const playerNameInput = document.getElementById('playerNameInput');
 const playerNameError = document.getElementById('playerNameError');
@@ -1413,6 +1414,15 @@ function closeLeaderboardModal() {
   if (leaderboardModal) {
     leaderboardModal.classList.add('hidden');
   }
+}
+
+function clearLeaderboard() {
+  try {
+    localStorage.removeItem(leaderboardStorageKey);
+  } catch (e) {
+    // ignore
+  }
+  renderLeaderboard();
 }
 
 function openNameEntryModal(action) {
@@ -1744,6 +1754,11 @@ if (freeNavigationButton) freeNavigationButton.onclick = () => {
 
 if (leaderboardButton) leaderboardButton.onclick = openLeaderboardModal;
 if (closeLeaderboardButton) closeLeaderboardButton.onclick = closeLeaderboardModal;
+if (clearLeaderboardButton) clearLeaderboardButton.onclick = () => {
+  if (confirm('Tem a certeza que pretende limpar a tabela de classificação?')) {
+    clearLeaderboard();
+  }
+};
 if (confirmPlayerNameButton) confirmPlayerNameButton.onclick = startGameWithEnteredName;
 if (cancelPlayerNameButton) cancelPlayerNameButton.onclick = closeNameEntryModal;
 
