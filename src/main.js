@@ -684,8 +684,9 @@ const ghostCells = [
 
 // --- NOVO: ARRAY DE DADOS DOS FANTASMAS ---
 const ghostsData = [];
-const ghostBaseSpeed = 4.5;
-const ghostTurnChance = 0.32;
+const initialGhostBaseSpeed = 4.5;
+let ghostBaseSpeed = initialGhostBaseSpeed;
+const ghostTurnChance = 0.75;
 const ghostDecisionEpsilon = tileSize * 0.18;
 const ghostDirections = [
   new THREE.Vector3(1, 0, 0),
@@ -720,7 +721,36 @@ function getGhostJunctionInfo(position) {
   };
 }
 
-for (const gc of ghostCells) {
+function getBestGhostTurnTowardTarget(position, directions, targetPosition) {
+  if (!targetPosition || directions.length === 0) {
+    return null;
+  }
+
+  let bestDirection = null;
+  let bestDistance = Infinity;
+
+  directions.forEach((direction) => {
+    const sampleX = position.x + direction.x * tileSize;
+    const sampleZ = position.z + direction.z * tileSize;
+    const distance = Math.hypot(targetPosition.x - sampleX, targetPosition.z - sampleZ);
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestDirection = direction;
+    }
+  });
+
+  return bestDirection;
+}
+
+const ghostChaseOffsets = [
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(1.5, 0, 0),
+  new THREE.Vector3(-1.5, 0, 0),
+  new THREE.Vector3(0, 0, 1.5),
+];
+
+ghostCells.forEach((gc, index) => {
   const ghost = createGhostModel(gc.color, tileSize);
   const gw = gridToWorld(gc.row, gc.col);
   ghost.position.set(gw.x, 0.5, gw.z);
@@ -737,8 +767,9 @@ for (const gc of ghostCells) {
       isFrightened: false,
       frightenedTimer: 0,
       lastJunctionKey: null,
+      chaseOffset: ghostChaseOffsets[index % ghostChaseOffsets.length].clone(),
   });
-}
+});
 
 // Resize
 window.addEventListener("resize", () => {
@@ -772,6 +803,8 @@ function configureControlsForFreeNavigation() {
 }
 
 function resetGameEntities() {
+  ghostBaseSpeed = initialGhostBaseSpeed;
+
     const startPos = gridToWorld(12, 12);
     pacman.position.set(startPos.x, 0.5, startPos.z);
     pacman.rotation.y = 0;
@@ -1127,11 +1160,16 @@ function animate() {
                 ghost.lastJunctionKey = null;
               } else if (junctionInfo.key !== ghost.lastJunctionKey) {
                 const backDir = ghost.moveDir.clone().negate();
-                const forwardDir = ghostDirections.find((direction) => direction.equals(ghost.moveDir));
-                const sideDirs = junctionInfo.validDirs.filter((direction) => !direction.equals(backDir) && !direction.equals(forwardDir));
+                const candidateDirs = junctionInfo.validDirs.filter((direction) => !direction.equals(backDir));
+                const chaseTarget = pacman.position.clone().add(ghost.chaseOffset);
+                const pacmanTurnDir = getBestGhostTurnTowardTarget(ghost.mesh.position, candidateDirs, chaseTarget);
 
-                if (sideDirs.length > 0 && Math.random() < ghostTurnChance) {
-                  ghost.moveDir.copy(sideDirs[Math.floor(Math.random() * sideDirs.length)]);
+                if (pacmanTurnDir && Math.random() < ghostTurnChance) {
+                  ghost.moveDir.copy(pacmanTurnDir);
+                } else if (candidateDirs.length > 0) {
+                  const fallbackDirs = candidateDirs.filter((direction) => !direction.equals(pacmanTurnDir));
+                  const dirsToUse = fallbackDirs.length > 0 ? fallbackDirs : candidateDirs;
+                  ghost.moveDir.copy(dirsToUse[Math.floor(Math.random() * dirsToUse.length)]);
                 }
 
                 ghost.lastJunctionKey = junctionInfo.key;
@@ -1606,6 +1644,12 @@ function restartGameplaySession() {
 }
 
 function restartMazeLevel() {
+  ghostBaseSpeed *= 1.1;
+
+  ghostsData.forEach((ghost) => {
+    ghost.speed = ghost.isFrightened ? ghostBaseSpeed * 0.5 : ghostBaseSpeed;
+  });
+
   populateCollectibles();
 }
 
