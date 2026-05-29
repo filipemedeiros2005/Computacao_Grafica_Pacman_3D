@@ -5,6 +5,7 @@ const backToMazeButton = document.querySelector("#backToMazeButton");
 const previousCharacterButton = document.querySelector("#previousCharacterButton");
 const nextCharacterButton = document.querySelector("#nextCharacterButton");
 const characterNameLabel = document.querySelector("#characterNameLabel");
+const animateButton = document.querySelector("#animateButton");
 
 function getAssetBase() {
   if (import.meta.env?.BASE_URL) {
@@ -149,6 +150,7 @@ function createPacmanModel(size) {
   // Rodar no eixo X para a boca abrir virada para a frente (+Z)
   upperHemisphere.rotation.x = -0.32;
   upperHemisphere.position.y = baseLift;
+  upperHemisphere.name = 'pacman_upper';
 
   // Metade inferior
   const lowerHemisphere = new THREE.Mesh(
@@ -158,6 +160,7 @@ function createPacmanModel(size) {
   // Rodar no eixo X simetricamente
   lowerHemisphere.rotation.x = 0.32;
   lowerHemisphere.position.y = baseLift;
+  lowerHemisphere.name = 'pacman_lower';
 
   // --- CORREÇÃO DA BOCA ---
   // Criar o fundo da boca (duas tampas circulares) para não ser transparente, usando a textura
@@ -310,6 +313,7 @@ const characterDefinitions = [
 
 let characterIndex = 0;
 let activeCharacter = null;
+let animationsEnabled = false;
 
 function showCharacter(index) {
   characterIndex = (index + characterDefinitions.length) % characterDefinitions.length;
@@ -320,8 +324,24 @@ function showCharacter(index) {
 
   const selected = characterDefinitions[characterIndex];
   activeCharacter = selected.build();
-  activeCharacter.position.y = 0.03;
+  // add to scene first so bounding box can be computed reliably
   scene.add(activeCharacter);
+  // compute bounding box to place the model on the floor (avoid dipping during bobbing)
+  const bbox = new THREE.Box3().setFromObject(activeCharacter);
+  const minY = bbox.min.y;
+  const desiredFloorY = 0.03;
+  const baseY = desiredFloorY - minY;
+  activeCharacter.position.y = baseY;
+  activeCharacter.userData.baseY = baseY;
+  activeCharacter.userData.animPhase = Math.random() * Math.PI * 2;
+  activeCharacter.userData.animType = selected.name === 'Pacman' ? 'pacman' : 'ghost';
+  // store base intensities for lights
+  activeCharacter.traverse((c) => {
+    if (c.type === 'PointLight' || c.isLight) {
+      c.userData = c.userData || {};
+      c.userData.baseIntensity = c.intensity;
+    }
+  });
 
   characterNameLabel.textContent = selected.name;
   orbit.yaw = 0;
@@ -359,6 +379,11 @@ backToMazeButton.addEventListener("click", () => {
   window.location.href = "./index.html";
 });
 
+animateButton.addEventListener('click', () => {
+  animationsEnabled = !animationsEnabled;
+  animateButton.textContent = animationsEnabled ? 'Parar' : 'Animar';
+});
+
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -376,7 +401,60 @@ function animate() {
   keyLight.position.x = 3.5 + Math.cos(t * 0.8) * 0.35;
 
   if (activeCharacter) {
-    activeCharacter.rotation.y += 0.004;
+    const t = clock.getElapsedTime();
+    if (animationsEnabled) {
+      activeCharacter.rotation.y += 0.02;
+      const phase = activeCharacter.userData.animPhase || 0;
+      // Pacman: abrir/fechar a boca
+      if (activeCharacter.userData.animType === 'pacman') {
+        const mouthSpeed = 6.0;
+        const mouthAmount = 0.6; // amplitude em radianos
+        const mouthOpen = Math.max(0, Math.sin(t * mouthSpeed + phase));
+        const upper = activeCharacter.getObjectByName('pacman_upper');
+        const lower = activeCharacter.getObjectByName('pacman_lower');
+        if (upper) upper.rotation.x = -0.32 - mouthOpen * mouthAmount;
+        if (lower) lower.rotation.x = 0.32 + mouthOpen * mouthAmount;
+        // leve bob vertical para dar vida
+        activeCharacter.position.y = activeCharacter.userData.baseY + Math.sin(t * 2.2 + phase) * 0.03;
+        // pequeno pulso nas luzes/materials para consistência
+        activeCharacter.traverse((c) => {
+          if (c.type === 'PointLight' || c.isLight) {
+            c.intensity = (c.userData?.baseIntensity ?? c.intensity) + Math.sin(t * 3 + phase) * 0.18;
+          }
+          if (c.material && 'emissiveIntensity' in c.material) {
+            c.material.emissiveIntensity = 0.38 + Math.sin(t * 3 + phase) * 0.18;
+          }
+        });
+      } else {
+        // ghosts: manter bobbing/rotacao já definida
+        const speed = 2.6;
+        const amount = 0.18;
+        activeCharacter.position.y = activeCharacter.userData.baseY + Math.sin(t * speed + phase) * amount;
+        activeCharacter.traverse((c) => {
+          if (c.type === 'PointLight' || c.isLight) {
+            c.intensity = (c.userData?.baseIntensity ?? c.intensity) + Math.sin(t * 3 + phase) * 0.35;
+          }
+          if (c.material && 'emissiveIntensity' in c.material) {
+            c.material.emissiveIntensity = 0.38 + Math.sin(t * 3 + phase) * 0.35;
+          }
+        });
+      }
+    } else {
+      activeCharacter.rotation.y += 0.004;
+      activeCharacter.position.y = activeCharacter.userData?.baseY || 0.03;
+      // restore light/material intensities
+      activeCharacter.traverse((c) => {
+        if (c.type === 'PointLight' || c.isLight) {
+          if (c.userData && typeof c.userData.baseIntensity !== 'undefined') c.intensity = c.userData.baseIntensity;
+        }
+        if (c.material && 'emissiveIntensity' in c.material) {
+          c.material.emissiveIntensity = Math.max(c.material.emissiveIntensity, 0.38);
+        }
+        // restaurar boca do Pacman se existir
+        if (c.name === 'pacman_upper') c.rotation.x = -0.32;
+        if (c.name === 'pacman_lower') c.rotation.x = 0.32;
+      });
+    }
   }
 
   updateCameraFromOrbit();

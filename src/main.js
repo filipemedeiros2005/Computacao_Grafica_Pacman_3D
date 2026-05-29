@@ -301,15 +301,21 @@ function populateCollectibles() {
         if ((row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23)) {
           const pp = new THREE.Mesh(powerPelletGeo, powerPelletMat);
           pp.userData.collectibleType = 'power';
-          pp.userData.baseY = 0.6;
+          // elevar a base para um flutuar mais visível
+          pp.userData.baseY = 0.95;
           pp.userData.bobPhase = Math.random() * Math.PI * 2;
-          pp.userData.spinSpeed = 0.42 + Math.random() * 0.1;
-          pp.userData.bobSpeed = 1.7 + Math.random() * 0.3;
-          pp.userData.bobAmount = 0.085;
-          pp.position.set(worldPos.x, 0.6, worldPos.z);
-          // Adicionar luz ao power pellet
+          // apenas flutuação vertical (sem rotação ou escala extra)
+          pp.userData.spinSpeed = 0;
+          pp.userData.bobSpeed = 1.4 + Math.random() * 0.6;
+          // amplitude visível para subida/descida
+          pp.userData.bobAmount = 0.28;
+          pp.userData.scalePulse = 0;
+          pp.position.set(worldPos.x, pp.userData.baseY, worldPos.z);
+          // Adicionar luz ao power pellet e registar intensidade base
           const ppLight = new THREE.PointLight(0xffffff, 12, 6);
           ppLight.position.set(0, 0, 0);
+          ppLight.userData = ppLight.userData || {};
+          ppLight.userData.baseIntensity = ppLight.intensity;
           pp.add(ppLight);
           powerPelletsGroup.add(pp);
         } else {
@@ -662,11 +668,37 @@ function createGhostModel(color, size) {
   rightEye.scale.set(0.9, 1.45, 0.75);
   rightEye.position.set(bodyWidth * 0.22, totalHeight * 0.76 + scallopRadius, bodyDepth / 2 + 0.01);
 
+  const footMaterial = new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: color,
+    emissiveIntensity: 0.05,
+    roughness: 0.55,
+    metalness: 0.02,
+  });
+  const footGeometry = new THREE.SphereGeometry(bodyWidth * 0.09, 12, 10);
+  const footBaseY = scallopRadius * 0.34;
+
+  const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
+  leftFoot.position.set(-bodyWidth * 0.18, footBaseY, bodyDepth * 0.08);
+
+  const centerFoot = new THREE.Mesh(footGeometry, footMaterial);
+  centerFoot.position.set(0, footBaseY * 0.92, -bodyDepth * 0.01);
+
+  const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
+  rightFoot.position.set(bodyWidth * 0.18, footBaseY, bodyDepth * 0.08);
+
   const floorLight = new THREE.PointLight(color, 10, 5); 
   floorLight.position.set(0, 0.5, 0);
   ghostLights.push(floorLight);
   
-  ghost.add(shell, leftEye, rightEye, floorLight);
+  ghost.userData.footParts = [leftFoot, centerFoot, rightFoot];
+  ghost.userData.footBaseY = footBaseY;
+  ghost.userData.footStepPhase = Math.random() * Math.PI * 2;
+  ghost.userData.footStepSpeed = 7.2;
+  // aumentar a elevação dos pés para ficar visível como o bobbing
+  ghost.userData.footLiftAmount = scallopRadius * 0.95;
+
+  ghost.add(shell, leftEye, rightEye, leftFoot, centerFoot, rightFoot, floorLight);
   return ghost;
 }
 
@@ -768,6 +800,15 @@ ghostCells.forEach((gc, index) => {
       frightenedTimer: 0,
       lastJunctionKey: null,
       chaseOffset: ghostChaseOffsets[index % ghostChaseOffsets.length].clone(),
+      baseY: 0.5,
+      bobPhase: index * 1.7,
+      bobSpeed: 2.6 + index * 0.2,
+      bobAmount: 0.34,
+      footParts: ghost.userData.footParts || [],
+      footBaseY: ghost.userData.footBaseY || 0,
+      footStepPhase: ghost.userData.footStepPhase || 0,
+      footStepSpeed: ghost.userData.footStepSpeed || 7.2,
+      footLiftAmount: ghost.userData.footLiftAmount || 0,
   });
 });
 
@@ -1023,8 +1064,9 @@ function animate() {
       }
 
       if (type === 'power') {
-        collectible.rotation.y += motion.spinY * dt;
-        collectible.position.y = motion.baseY + Math.sin(t * motion.bobSpeed + motion.phase) * motion.bobAmount;
+        // apenas bob vertical (subir/descer)
+        const wave = Math.sin(t * motion.bobSpeed + motion.phase);
+        collectible.position.y = motion.baseY + wave * motion.bobAmount;
         continue;
       }
 
@@ -1209,6 +1251,24 @@ function animate() {
                   ghost.mesh.position.x = THREE.MathUtils.lerp(ghost.mesh.position.x, xOffset + currentCol * tileSize, 0.3);
               }
           }
+
+                if (ghost.moveDir.lengthSq() > 0) {
+                  ghost.mesh.position.y = ghost.baseY + Math.sin(t * ghost.bobSpeed + ghost.bobPhase) * ghost.bobAmount;
+                        const footWave = t * ghost.footStepSpeed + ghost.footStepPhase;
+                        ghost.footParts.forEach((foot, footIndex) => {
+                            const phaseOffset = footIndex * (Math.PI * 2 / 3);
+                            const lift = Math.max(0, Math.sin(footWave + phaseOffset));
+                            foot.position.y = ghost.footBaseY + lift * ghost.footLiftAmount;
+                            // aumenta a intensidade do "passo" escalando mais visivelmente
+                            foot.scale.set(1 + lift * 0.25, 1 - lift * 0.45, 1 + lift * 0.25);
+                        });
+                } else {
+                  ghost.mesh.position.y = ghost.baseY;
+                        ghost.footParts.forEach((foot) => {
+                            foot.position.y = ghost.footBaseY;
+                            foot.scale.set(1, 1, 1);
+                        });
+                }
 
           // --- CORREÇÃO DE ROTAÇÃO: Faz os olhos olharem para onde estão a andar ---
           if (ghost.moveDir.lengthSq() > 0) {
