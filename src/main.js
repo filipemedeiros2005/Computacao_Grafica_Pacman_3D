@@ -556,39 +556,6 @@ function createBananaModel() {
   blossom.rotation.z = Math.PI / 8;
   banana.add(blossom);
 
-  const topRidgeMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd1a11f,
-    roughness: 0.62,
-    metalness: 0.01,
-  });
-
-  const topRidge = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.03, 0.05), topRidgeMaterial);
-  topRidge.position.set(-0.03, 0.20, 0.07);
-  topRidge.rotation.z = -Math.PI / 14;
-  banana.add(topRidge);
-
-  const sideShadow = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.035, 0.03), new THREE.MeshStandardMaterial({
-    color: 0xc78d19,
-    roughness: 0.7,
-    metalness: 0.0,
-    transparent: true,
-    opacity: 0.8,
-  }));
-  sideShadow.position.set(-0.02, 0.09, -0.06);
-  sideShadow.rotation.z = -Math.PI / 13;
-  banana.add(sideShadow);
-
-  const joiner = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.09, 0.09), new THREE.MeshStandardMaterial({
-    color: 0xe7bf34,
-    roughness: 0.74,
-    metalness: 0.0,
-    transparent: true,
-    opacity: 0.55,
-  }));
-  joiner.position.set(-0.03, 0.07, -0.02);
-  joiner.rotation.z = -Math.PI / 14;
-  banana.add(joiner);
-
   banana.rotation.z = -Math.PI / 11;
   banana.position.set(0, 0.03, 0);
 
