@@ -1,11 +1,10 @@
 import * as THREE from "three";
-// Importações locais usando o pacote npm que já tens instalado:
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const app = document.querySelector("#app");
 
-// Variáveis Globais
+// Estado global
 let controls;
 let is3DView = false;
 let isFreeLook = false;
@@ -13,7 +12,7 @@ let isFreeNavigationMode = false;
 let cameraAtiva;
 const ghostLights = [];
 
-// Renderer
+// Renderização
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -34,7 +33,7 @@ controls.minDistance = 2;
 controls.maxDistance = 25;
 controls.maxPolarAngle = Math.PI / 2;
 controls.minPolarAngle = 0;
-controls.zoomSpeed = 0.8; // Reduz a sensibilidade do zoom
+controls.zoomSpeed = 0.8;
 
 // Luzes
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
@@ -301,17 +300,13 @@ function populateCollectibles() {
         if ((row === 1 && col === 1) || (row === 1 && col === 23) || (row === 15 && col === 1) || (row === 15 && col === 23)) {
           const pp = new THREE.Mesh(powerPelletGeo, powerPelletMat);
           pp.userData.collectibleType = 'power';
-          // elevar a base para um flutuar mais visível
           pp.userData.baseY = 0.95;
           pp.userData.bobPhase = Math.random() * Math.PI * 2;
-          // apenas flutuação vertical (sem rotação ou escala extra)
           pp.userData.spinSpeed = 0;
           pp.userData.bobSpeed = 1.4 + Math.random() * 0.6;
-          // amplitude visível para subida/descida
           pp.userData.bobAmount = 0.28;
           pp.userData.scalePulse = 0;
           pp.position.set(worldPos.x, pp.userData.baseY, worldPos.z);
-          // Adicionar luz ao power pellet e registar intensidade base
           const ppLight = new THREE.PointLight(0xffffff, 12, 6);
           ppLight.position.set(0, 0, 0);
           ppLight.userData = ppLight.userData || {};
@@ -334,7 +329,6 @@ function populateCollectibles() {
     cherryModel.position.set(cherryWorld.x, 0.5, cherryWorld.z);
     cherryModel.userData.collectibleType = 'cherry';
     configureCollectibleMotion(cherryModel, 'cherry');
-    // Adicionar luz à cereja
     const cherryLight = new THREE.PointLight(0xdc2626, 10, 6);
     cherryLight.position.set(0, 0, 0);
     cherryModel.add(cherryLight);
@@ -347,7 +341,6 @@ function populateCollectibles() {
     orangeModel.position.set(orangeWorld.x, 0.5, orangeWorld.z);
     orangeModel.userData.collectibleType = 'orange';
     configureCollectibleMotion(orangeModel, 'orange');
-    // Adicionar luz à laranja
     const orangeLight = new THREE.PointLight(0xff9500, 10, 6);
     orangeLight.position.set(0, 0, 0);
     orangeModel.add(orangeLight);
@@ -360,7 +353,6 @@ function populateCollectibles() {
     bananaModel.position.set(bananaWorld.x, 0.5, bananaWorld.z);
     bananaModel.userData.collectibleType = 'banana';
     configureCollectibleMotion(bananaModel, 'banana');
-    // Adicionar luz à banana
     const bananaLight = new THREE.PointLight(0xffd60a, 10, 6);
     bananaLight.position.set(0, 0, 0);
     bananaModel.add(bananaLight);
@@ -1591,10 +1583,11 @@ function getCollectibleScore(collectibleType) {
     case 'normal':
       return 10;
     case 'cherry':
-    case 'orange':
       return 20;
+    case 'orange':
+      return 40;
     case 'banana':
-      return 50;
+      return 60;
     default:
       return 0;
   }

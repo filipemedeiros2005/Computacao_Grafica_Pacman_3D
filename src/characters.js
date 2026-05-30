@@ -7,6 +7,7 @@ const nextCharacterButton = document.querySelector("#nextCharacterButton");
 const characterNameLabel = document.querySelector("#characterNameLabel");
 const animateButton = document.querySelector("#animateButton");
 
+// Asset base
 function getAssetBase() {
   if (import.meta.env?.BASE_URL) {
     return import.meta.env.BASE_URL;
@@ -128,12 +129,12 @@ const ring = new THREE.Mesh(
 ring.rotation.x = -Math.PI / 2;
 scene.add(ring);
 
+// Character builders
 function createPacmanModel(size) {
   const pacman = new THREE.Group();
   const radius = size * 0.38;
   const baseLift = radius;
 
-  // Carregador de texturas do Three.js
   const textureLoader = new THREE.TextureLoader();
 
   const pacmanMaterial = new THREE.MeshStandardMaterial({
@@ -142,67 +143,54 @@ function createPacmanModel(size) {
     metalness: 0.05,
   });
 
-  // Metade superior
   const upperHemisphere = new THREE.Mesh(
     new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
     pacmanMaterial
   );
-  // Rodar no eixo X para a boca abrir virada para a frente (+Z)
   upperHemisphere.rotation.x = -0.32;
   upperHemisphere.position.y = baseLift;
   upperHemisphere.name = 'pacman_upper';
 
-  // Metade inferior
   const lowerHemisphere = new THREE.Mesh(
     new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
     pacmanMaterial
   );
-  // Rodar no eixo X simetricamente
   lowerHemisphere.rotation.x = 0.32;
   lowerHemisphere.position.y = baseLift;
   lowerHemisphere.name = 'pacman_lower';
 
-  // --- CORREÇÃO DA BOCA ---
-  // Criar o fundo da boca (duas tampas circulares) para não ser transparente, usando a textura
   const mouthTexture = textureLoader.load('./img/pacman_fundo_para_a_boca.png');
   const mouthMaterial = new THREE.MeshBasicMaterial({ map: mouthTexture });
   const capGeometry = new THREE.CircleGeometry(radius, 32);
 
-  // Tampa para a parte de cima da boca (virada para baixo)
   const upperCap = new THREE.Mesh(capGeometry, mouthMaterial);
-  upperCap.rotation.x = Math.PI / 2; 
+  upperCap.rotation.x = Math.PI / 2;
   upperHemisphere.add(upperCap);
 
-  // Tampa para a parte de baixo da boca (virada para cima)
   const lowerCap = new THREE.Mesh(capGeometry, mouthMaterial);
   lowerCap.rotation.x = -Math.PI / 2;
   lowerHemisphere.add(lowerCap);
 
- // --- CORREÇÃO DOS OLHOS ---
   const eyeTexture = textureLoader.load('./img/pacman_olho.png');
-  
-  // Adicionamos alphaTest para cortar o fundo transparente e DoubleSide para se ver de trás
-  const eyeMaterial = new THREE.MeshBasicMaterial({ 
-    map: eyeTexture, 
+
+  const eyeMaterial = new THREE.MeshBasicMaterial({
+    map: eyeTexture,
     transparent: true,
-    alphaTest: 0.1, 
-    side: THREE.DoubleSide 
+    alphaTest: 0.1,
+    side: THREE.DoubleSide,
   });
-  
-  const eyeSize = radius * 0.85; // Aumenta este multiplicador ao teu gosto
+
+  const eyeSize = radius * 0.85;
   const eyeGeometry = new THREE.PlaneGeometry(eyeSize, eyeSize);
 
-  // Função auxiliar para colar os olhos exatamente na superfície
   function putOnSurface(x, y, z) {
-    // Reduzi o multiplicador para 1.005 para ficar quase colado à esfera
     return new THREE.Vector3(x, y, z).normalize().multiplyScalar(radius * 1.005);
   }
 
   const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-  // Ajustei os vetores para ficarem mais naturais no rosto
-  leftEye.position.copy(putOnSurface(-0.8, 1.0, 1.8)); 
-  leftEye.lookAt(leftEye.position.clone().multiplyScalar(2)); 
-  upperHemisphere.add(leftEye); 
+  leftEye.position.copy(putOnSurface(-0.8, 1.0, 1.8));
+  leftEye.lookAt(leftEye.position.clone().multiplyScalar(2));
+  upperHemisphere.add(leftEye);
 
   const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
   rightEye.position.copy(putOnSurface(0.8, 1.0, 1.8));
@@ -302,6 +290,7 @@ function createGhostModel(color, size) {
   return ghost;
 }
 
+// Character viewer state
 const tileSize = 2;
 const characterDefinitions = [
   { name: "Pacman", build: () => createPacmanModel(tileSize) },
@@ -324,9 +313,7 @@ function showCharacter(index) {
 
   const selected = characterDefinitions[characterIndex];
   activeCharacter = selected.build();
-  // add to scene first so bounding box can be computed reliably
   scene.add(activeCharacter);
-  // compute bounding box to place the model on the floor (avoid dipping during bobbing)
   const bbox = new THREE.Box3().setFromObject(activeCharacter);
   const minY = bbox.min.y;
   const desiredFloorY = 0.03;
@@ -335,7 +322,6 @@ function showCharacter(index) {
   activeCharacter.userData.baseY = baseY;
   activeCharacter.userData.animPhase = Math.random() * Math.PI * 2;
   activeCharacter.userData.animType = selected.name === 'Pacman' ? 'pacman' : 'ghost';
-  // store base intensities for lights
   activeCharacter.traverse((c) => {
     if (c.type === 'PointLight' || c.isLight) {
       c.userData = c.userData || {};
@@ -394,6 +380,7 @@ window.addEventListener("resize", () => {
 
 const clock = new THREE.Clock();
 
+// Animation loop
 function animate() {
   requestAnimationFrame(animate);
 
@@ -405,18 +392,15 @@ function animate() {
     if (animationsEnabled) {
       activeCharacter.rotation.y += 0.02;
       const phase = activeCharacter.userData.animPhase || 0;
-      // Pacman: abrir/fechar a boca
       if (activeCharacter.userData.animType === 'pacman') {
         const mouthSpeed = 6.0;
-        const mouthAmount = 0.6; // amplitude em radianos
+        const mouthAmount = 0.6;
         const mouthOpen = Math.max(0, Math.sin(t * mouthSpeed + phase));
         const upper = activeCharacter.getObjectByName('pacman_upper');
         const lower = activeCharacter.getObjectByName('pacman_lower');
         if (upper) upper.rotation.x = -0.32 - mouthOpen * mouthAmount;
         if (lower) lower.rotation.x = 0.32 + mouthOpen * mouthAmount;
-        // leve bob vertical para dar vida
         activeCharacter.position.y = activeCharacter.userData.baseY + Math.sin(t * 2.2 + phase) * 0.03;
-        // pequeno pulso nas luzes/materials para consistência
         activeCharacter.traverse((c) => {
           if (c.type === 'PointLight' || c.isLight) {
             c.intensity = (c.userData?.baseIntensity ?? c.intensity) + Math.sin(t * 3 + phase) * 0.18;
@@ -426,7 +410,6 @@ function animate() {
           }
         });
       } else {
-        // ghosts: manter bobbing/rotacao já definida
         const speed = 2.6;
         const amount = 0.18;
         activeCharacter.position.y = activeCharacter.userData.baseY + Math.sin(t * speed + phase) * amount;
@@ -442,7 +425,6 @@ function animate() {
     } else {
       activeCharacter.rotation.y += 0.004;
       activeCharacter.position.y = activeCharacter.userData?.baseY || 0.03;
-      // restore light/material intensities
       activeCharacter.traverse((c) => {
         if (c.type === 'PointLight' || c.isLight) {
           if (c.userData && typeof c.userData.baseIntensity !== 'undefined') c.intensity = c.userData.baseIntensity;
@@ -450,7 +432,6 @@ function animate() {
         if (c.material && 'emissiveIntensity' in c.material) {
           c.material.emissiveIntensity = Math.max(c.material.emissiveIntensity, 0.38);
         }
-        // restaurar boca do Pacman se existir
         if (c.name === 'pacman_upper') c.rotation.x = -0.32;
         if (c.name === 'pacman_lower') c.rotation.x = 0.32;
       });
@@ -463,8 +444,7 @@ function animate() {
 
 animate();
 
-// --- MÚSICA DO MENU DE PERSONAGENS ---
-// Nota: Podes mudar o nome do ficheiro aqui se quiseres uma música diferente!
+// Audio
 const assetBase = getAssetBase();
 const charMusic = new Audio(`${assetBase}audio/characters_theme.mp3`); 
 charMusic.loop = true;
